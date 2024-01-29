@@ -1,0 +1,15 @@
+[gd_scene load_steps=3 format=3 uid="uid://byck7ps2sbg07"]
+
+[ext_resource type="Script" path="res://Scripts/PlayerInput.gd" id="1_bbb52"]
+[ext_resource type="Texture2D" uid="uid://dt3iugg2qd2q7" path="res://icon.svg" id="2_ivkns"]
+
+[node name="Character" type="Node2D"]
+script = ExtResource("1_bbb52")
+acceleration = 10000
+friction = 25.0
+maxSpeed = 750
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+position = Vector2(0, -26)
+scale = Vector2(0.445312, 0.445312)
+texture = ExtResource("2_ivkns")

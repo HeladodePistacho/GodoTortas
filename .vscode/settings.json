@@ -1,0 +1,12 @@
+{
+    "files.associations": {
+        "charconv": "cpp",
+        "format": "cpp",
+        "memory": "cpp",
+        "new": "cpp",
+        "span": "cpp",
+        "xmemory": "cpp",
+        "*.inc": "cpp",
+        "queue": "cpp"
+    }
+}

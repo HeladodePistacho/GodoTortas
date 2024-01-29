@@ -25,4 +25,5 @@ func _input(event):
 	
 	if event.is_action("Sstrong"):
 		print("--------------")
-		print(test)
+		print(event.as_text())
+		
