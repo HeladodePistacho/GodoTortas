@@ -1,6 +1,7 @@
 #include "register_types.h"
 
 #include "InputBuffer.h"
+#include "RollBackManager.h"
 
 #include <gdextension_interface.h>
 #include <godot_cpp/core/defs.hpp>
@@ -14,6 +15,7 @@ void initialize_example_module(ModuleInitializationLevel p_level) {
 	}
 
 	ClassDB::register_class<InputBuffer>();
+	ClassDB::register_class<RollbackManager>();
 }
 
 void uninitialize_example_module(ModuleInitializationLevel p_level) {
