@@ -1,13 +1,33 @@
 #ifndef INPUTBUFFER_H
 #define INPUTBUFFER_H
 
+
 #include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/core/object.hpp>
 #include <godot_cpp/classes/input_event.hpp>
+#include <godot_cpp/templates/hash_set.hpp>
+#include <unordered_set>
 #include <queue>
 
 namespace godot {
 
-struct InputElement
+class CustomInput : public Node {
+	GDCLASS(CustomInput, Node)
+protected:
+	static void _bind_methods();
+
+public:
+	CustomInput();
+	~CustomInput();
+
+	static void init();
+
+	static HashSet<String> _customActions;
+};
+
+
+
+/*struct InputElement
 {
 	public:
 	InputElement() = default;
@@ -60,7 +80,7 @@ public:
 	//std::queue<InputElement> buffer;
 	std::deque<InputElement> buffer;
 };
-
+*/
 }
 
 #endif

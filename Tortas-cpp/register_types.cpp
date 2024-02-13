@@ -10,12 +10,20 @@
 using namespace godot;
 
 void initialize_example_module(ModuleInitializationLevel p_level) {
-	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
-		return;
+
+	if (p_level == MODULE_INITIALIZATION_LEVEL_CORE) 
+	{
+		ClassDB::register_class<InputState>();
 	}
 
-	ClassDB::register_class<InputBuffer>();
-	ClassDB::register_class<RollbackManager>();
+	if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE) 
+	{
+		ClassDB::register_class<RollbackManager>();
+		ClassDB::register_class<CustomInput>();
+	}
+
+	//ClassDB::register_class<InputBuffer>();
+
 }
 
 void uninitialize_example_module(ModuleInitializationLevel p_level) {

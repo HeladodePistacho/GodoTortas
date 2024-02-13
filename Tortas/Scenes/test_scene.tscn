@@ -4,6 +4,12 @@
 
 [node name="TestScene" type="Node2D"]
 
-[node name="Character" parent="." instance=ExtResource("1_ellkx")]
+[node name="RollbackManager" type="RollbackManager" parent="."]
+
+[node name="Character" parent="." node_paths=PackedStringArray("rollbackManager") instance=ExtResource("1_ellkx")]
 position = Vector2(530, 351)
+rollbackManager = NodePath("../RollbackManager")
 dashSpeed = 1000
+
+[connection signal="onHandleInput" from="RollbackManager" to="Character" method="_on_rollback_manager_on_handle_input"]
+[connection signal="onSaveGameState" from="RollbackManager" to="Character" method="_on_rollback_manager_on_save_game_state"]

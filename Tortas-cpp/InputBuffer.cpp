@@ -1,11 +1,14 @@
 #include "InputBuffer.h"
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/classes/input_map.hpp>
+#include <godot_cpp/classes/input_event_joypad_button.hpp>
+#include <godot_cpp/classes/input_event_joypad_motion.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
+
 
 using namespace godot;
 
-namespace InputBufferConsts
+/*namespace InputBufferConsts
 {
     constexpr int bufferSize = 10; //Inputs will be 10 frames here
 }
@@ -46,8 +49,7 @@ void InputBuffer::_unhandled_input(const Ref<InputEvent> &event)
             
         }
     }
-
-    //Send signal to    
+ 
 }
 
 void InputBuffer::_process(double delta)
@@ -58,4 +60,30 @@ void InputBuffer::_process(double delta)
         //UtilityFunctions::print(input.getAction());
     }
 
+}*/
+
+
+HashSet<String> CustomInput::_customActions{2};
+/* = {
+    String("LLHorizontal"),
+    String("LRHorizontal")
+};*/
+
+void CustomInput::_bind_methods()
+{
+}
+
+CustomInput::CustomInput()
+{
+    
+}
+
+CustomInput::~CustomInput()
+{
+}
+
+void godot::CustomInput::init()
+{
+    _customActions.insert("LLHorizontal");
+    _customActions.insert("LRHorizontal");
 }
