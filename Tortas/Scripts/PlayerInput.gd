@@ -19,8 +19,6 @@ func _ready():
 	speedStrength = 0;
 	pass # Replace with function body.
 
-
-
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta):
 	if(abs(speedStrength) < 0.2):
@@ -35,21 +33,20 @@ func _process(delta):
 	pass
 
 
-func _on_rollback_manager_on_handle_input(action, value):
-
-	if(action == "LRHorizontal" or action == "LLHorizontal"):
-		speedStrength = Input.get_axis("LLHorizontal", "LRHorizontal")
-	
-	#print(speedStrength)
-	#print("Handle input signal ", action, " ! ", value)
-	pass # Replace with function body.
-
-
 func _on_rollback_manager_on_save_game_state():
-	var myData = PackedByteArray([position.x, position.y])
+	
 	rollbackManager.addToGameState(name, var_to_bytes(position) + var_to_bytes(currentSpeed))
 	
 	#var tests = var_to_bytes(position)
 	#print(tests)
 	#print(bytes_to_var(tests))
+	pass # Replace with function body.
+
+
+func _on_rollback_manager_on_handle_input(action, value):
+	
+	#Not the way but simplpifies code
+	if(action == "LLHorizontal" or action == "LRHorizontal"):
+		speedStrength = Input.get_axis("LLHorizontal","LRHorizontal")
+	
 	pass # Replace with function body.

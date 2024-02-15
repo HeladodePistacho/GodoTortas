@@ -5,6 +5,7 @@
 [node name="TestScene" type="Node2D"]
 
 [node name="RollbackManager" type="RollbackManager" parent="."]
+_processInputDelay = 4
 
 [node name="Character" parent="." node_paths=PackedStringArray("rollbackManager") instance=ExtResource("1_ellkx")]
 position = Vector2(530, 351)

@@ -6,8 +6,21 @@
 
 using namespace godot;
 
+void printInputState(const InputState& input)
+{    
+    UtilityFunctions::print("InputState: ", input.actions, " I ", input.values);
+}
+
 void RollbackManager::_bind_methods()
 {
+    //Properties
+    ClassDB::bind_method(D_METHOD("getDelay"), &RollbackManager::getDelay);
+	ClassDB::bind_method(D_METHOD("setDelay", "delay"), &RollbackManager::setDelay);
+    ClassDB::bind_method(D_METHOD("getRollFrames"), &RollbackManager::getRollFrames);
+	ClassDB::bind_method(D_METHOD("setRollFrames", "rollFrames"), &RollbackManager::setRollFrames);
+    ClassDB::add_property("RollbackManager", PropertyInfo(Variant::INT, "_processInputDelay", PROPERTY_HINT_RANGE, "0,60"), "setDelay", "getDelay");
+    ClassDB::add_property("RollbackManager", PropertyInfo(Variant::INT, "_numRollbackFrames", PROPERTY_HINT_RANGE, "1,20"), "setRollFrames", "getRollFrames");
+
     //Methods
     ClassDB::bind_method(D_METHOD("addToGameState", "name", "data"), &RollbackManager::addToGameState);
 
@@ -47,7 +60,6 @@ void godot::RollbackManager::_ready()
 
 void RollbackManager::_unhandled_input(const Ref<InputEvent> &event)
 {
-    InputState newState{};
     for(const String& action : CustomInput::_customActions)
     {
         if(!event->is_action(action))
@@ -55,18 +67,23 @@ void RollbackManager::_unhandled_input(const Ref<InputEvent> &event)
             continue;
         }
 
-        newState.localInputs.insert(action, event->get_action_strength(action));                
+        //newState.localInputs.insert(action, event->get_action_strength(action));   
+        _currentInputState.actions.push_back(action);
+        _currentInputState.values.push_back(event->get_action_strength(action));
     }
 
-    _inputs[(_frameNumber + _processInputDelay) % 256] = std::move(newState);
-
     
+
 }
 
 void godot::RollbackManager::_process(double delta)
 {
-    if (Engine::get_singleton()->is_editor_hint())
-        set_process_mode(Node::ProcessMode::PROCESS_MODE_DISABLED);
+    //Process Inputs
+    InputState& futureInputState = _inputs[(_frameNumber + _processInputDelay) % 256];
+    futureInputState.reset();
+    futureInputState.actions.append_array(_currentInputState.actions);
+    futureInputState.values.append_array(_currentInputState.values);
+    _currentInputState.reset();
 
     //Create Game State
     _currentGameState.reset();
@@ -76,7 +93,7 @@ void godot::RollbackManager::_process(double delta)
     emit_signal("onFrameStart");
 
     //Handle frame Inputs
-    onHandleInput(_inputs[_frameNumber % 256]);
+    onHandleInput(_inputs[_frameNumber]);
 
     //Frame Process
     emit_signal("onFrameUpdate", delta);
@@ -89,22 +106,20 @@ void godot::RollbackManager::_process(double delta)
     //Remove oldest frame state
 
     //Progress frame number
-    _frameNumber = (_frameNumber + 1) % 256;
+    _frameNumber >= 255 ? _frameNumber = 0 : ++_frameNumber;
 }
 
 void godot::RollbackManager::onHandleInput(const InputState &inputs)
 {
-    UtilityFunctions::print("-----------------------------");
-    for(const auto& [action, value] : inputs.localInputs)
+    if(inputs.actions.size() != inputs.values.size())
     {
-        UtilityFunctions::print(action, " ", value);
+        return;
     }
 
-    for(const auto& [action, value] : inputs.localInputs)
+    for(int i = 0; i < inputs.actions.size(); ++i)
     {
-        emit_signal("onHandleInput", action, value);
+        emit_signal("onHandleInput", inputs.actions[i], inputs.values[i]);
     }
-    
 }
 
 GameState& godot::RollbackManager::getCurrentGameState()

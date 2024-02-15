@@ -13,7 +13,7 @@ void initialize_example_module(ModuleInitializationLevel p_level) {
 
 	if (p_level == MODULE_INITIALIZATION_LEVEL_CORE) 
 	{
-		ClassDB::register_class<InputState>();
+		//ClassDB::register_class<InputState>();
 	}
 
 	if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE) 
