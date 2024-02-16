@@ -23,21 +23,16 @@ namespace godot
         TypedArray<String> actions;
         TypedArray<float> values;
 
-        HashMap<String, float> localInputs;
-        //std::unordered_map<std::string, float> localInputs;
-
         InputState() = default;
 
         // Copy constructor
         InputState(const InputState& other) : 
-        localInputs(other.localInputs),
         actions(other.actions),
         values(other.values)
         {}
 
         // Move constructor
         InputState(InputState&& other) noexcept : 
-        localInputs(std::move(other.localInputs)), 
         actions(std::move(other.actions)),
         values(std::move(other.values))
         {}
@@ -46,7 +41,6 @@ namespace godot
         {
             if (this != &other) 
             {
-                localInputs = other.localInputs;
                 actions = other.actions;
                 values = other.values;
             }
@@ -58,7 +52,6 @@ namespace godot
         {
             if (this != &other) 
             {
-                localInputs = std::move(other.localInputs);
                 actions = std::move(other.actions);
                 values = std::move(other.values);
             }
@@ -82,15 +75,16 @@ namespace godot
         };
 
         HashMap<String /*Name*/, ElementBufferData> elementsSaved;
+        TypedArray<String> elementsIds;
         PackedByteArray stateBuffer;
 
         GameState() = default;
 
         // Copy Constructor
-        GameState(const GameState& other) : elementsSaved(other.elementsSaved), stateBuffer(other.stateBuffer) {}
+        GameState(const GameState& other) : elementsSaved(other.elementsSaved), stateBuffer(other.stateBuffer), elementsIds(other.elementsIds) {}
 
         // Move Constructor
-        GameState(GameState&& other) noexcept : elementsSaved(std::move(other.elementsSaved)), stateBuffer(std::move(other.stateBuffer)) {}
+        GameState(GameState&& other) noexcept : elementsSaved(std::move(other.elementsSaved)), stateBuffer(std::move(other.stateBuffer)), elementsIds(std::move(other.elementsIds)) {}
 
         // Copy Assignment Operator
         GameState& operator=(const GameState& other) 
@@ -98,6 +92,7 @@ namespace godot
             if (this != &other) {
                 elementsSaved = other.elementsSaved;
                 stateBuffer = other.stateBuffer;
+                elementsIds = other.elementsIds;
             }
             return *this;
         }
@@ -108,6 +103,7 @@ namespace godot
             if (this != &other) {
                 elementsSaved = std::move(other.elementsSaved);
                 stateBuffer = std::move(other.stateBuffer);
+                elementsIds = std::move(other.elementsIds);
             }
             return *this;
         }
@@ -115,6 +111,7 @@ namespace godot
         void reset()
         {
             elementsSaved.clear();
+            elementsIds.clear();
             stateBuffer.clear();
         }
     };
@@ -125,7 +122,7 @@ namespace godot
         GameState frameGameState{};
         int frameIndex = 0;
 
-        FrameState(InputState&& inputs, GameState&& gameState, int frame) : 
+        FrameState(const InputState& inputs, const GameState& gameState, int frame) : 
         frameInputs(inputs),
         frameGameState(gameState),
         frameIndex(frame)
@@ -153,6 +150,7 @@ namespace godot
         InputState _currentInputState{};
         GameState _currentGameState{};
 
+        bool doreset = false;
     protected:
 	    static void _bind_methods();
 
@@ -162,12 +160,13 @@ namespace godot
 
         void _ready() override;
         void _unhandled_input(const Ref<InputEvent>& event) override;
-        void _process(double delta) override;
+        void _physics_process(double delta) override;
 
         void onHandleInput(const InputState& inputs);
 
         GameState& getCurrentGameState();
         void addToGameState(const String &name, const PackedByteArray& data);
+        void onResetGameState();
 
         bool test = true;
 

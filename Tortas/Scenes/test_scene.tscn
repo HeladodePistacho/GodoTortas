@@ -1,16 +1,31 @@
-[gd_scene load_steps=2 format=3 uid="uid://cienxkgkxhs41"]
+[gd_scene load_steps=3 format=3 uid="uid://cienxkgkxhs41"]
 
+[ext_resource type="Script" path="res://Scenes/Settings.gd" id="1_41j4q"]
 [ext_resource type="PackedScene" uid="uid://byck7ps2sbg07" path="res://Scenes/CharacterBase.tscn" id="1_ellkx"]
 
 [node name="TestScene" type="Node2D"]
+script = ExtResource("1_41j4q")
 
 [node name="RollbackManager" type="RollbackManager" parent="."]
-_processInputDelay = 4
+_processInputDelay = 30
+_numRollbackFrames = 120
 
 [node name="Character" parent="." node_paths=PackedStringArray("rollbackManager") instance=ExtResource("1_ellkx")]
 position = Vector2(530, 351)
 rollbackManager = NodePath("../RollbackManager")
+maxSpeed = 100
 dashSpeed = 1000
 
+[node name="Character2" parent="." node_paths=PackedStringArray("rollbackManager") instance=ExtResource("1_ellkx")]
+position = Vector2(297, 192)
+rollbackManager = NodePath("../RollbackManager")
+maxSpeed = 900
+
+[connection signal="onFrameUpdate" from="RollbackManager" to="Character" method="_on_rollback_manager_on_frame_update"]
+[connection signal="onFrameUpdate" from="RollbackManager" to="Character2" method="_on_rollback_manager_on_frame_update"]
 [connection signal="onHandleInput" from="RollbackManager" to="Character" method="_on_rollback_manager_on_handle_input"]
+[connection signal="onHandleInput" from="RollbackManager" to="Character2" method="_on_rollback_manager_on_handle_input"]
+[connection signal="onResetState" from="RollbackManager" to="Character" method="_on_rollback_manager_on_reset_state"]
+[connection signal="onResetState" from="RollbackManager" to="Character2" method="_on_rollback_manager_on_reset_state"]
 [connection signal="onSaveGameState" from="RollbackManager" to="Character" method="_on_rollback_manager_on_save_game_state"]
+[connection signal="onSaveGameState" from="RollbackManager" to="Character2" method="_on_rollback_manager_on_save_game_state"]

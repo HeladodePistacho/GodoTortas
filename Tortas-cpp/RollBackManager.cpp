@@ -18,8 +18,8 @@ void RollbackManager::_bind_methods()
 	ClassDB::bind_method(D_METHOD("setDelay", "delay"), &RollbackManager::setDelay);
     ClassDB::bind_method(D_METHOD("getRollFrames"), &RollbackManager::getRollFrames);
 	ClassDB::bind_method(D_METHOD("setRollFrames", "rollFrames"), &RollbackManager::setRollFrames);
-    ClassDB::add_property("RollbackManager", PropertyInfo(Variant::INT, "_processInputDelay", PROPERTY_HINT_RANGE, "0,60"), "setDelay", "getDelay");
-    ClassDB::add_property("RollbackManager", PropertyInfo(Variant::INT, "_numRollbackFrames", PROPERTY_HINT_RANGE, "1,20"), "setRollFrames", "getRollFrames");
+    ClassDB::add_property("RollbackManager", PropertyInfo(Variant::INT, "_processInputDelay", PROPERTY_HINT_RANGE, "0,120"), "setDelay", "getDelay");
+    ClassDB::add_property("RollbackManager", PropertyInfo(Variant::INT, "_numRollbackFrames", PROPERTY_HINT_RANGE, "1,120"), "setRollFrames", "getRollFrames");
 
     //Methods
     ClassDB::bind_method(D_METHOD("addToGameState", "name", "data"), &RollbackManager::addToGameState);
@@ -30,6 +30,8 @@ void RollbackManager::_bind_methods()
     ADD_SIGNAL(MethodInfo("onFrameStart"));
     ADD_SIGNAL(MethodInfo("onFrameUpdate", PropertyInfo(Variant::FLOAT, "delta")));
     ADD_SIGNAL(MethodInfo("onFrameEnd"));
+
+    ADD_SIGNAL(MethodInfo("onResetState", PropertyInfo(Variant::STRING, "element"), PropertyInfo(Variant::PACKED_BYTE_ARRAY, "gameState")));
 }
 
 RollbackManager::RollbackManager()
@@ -72,11 +74,14 @@ void RollbackManager::_unhandled_input(const Ref<InputEvent> &event)
         _currentInputState.values.push_back(event->get_action_strength(action));
     }
 
-    
+    if(event->is_action_pressed("test"))
+    {
+        doreset = true;
+    }
 
 }
 
-void godot::RollbackManager::_process(double delta)
+void godot::RollbackManager::_physics_process(double delta)
 {
     //Process Inputs
     InputState& futureInputState = _inputs[(_frameNumber + _processInputDelay) % 256];
@@ -92,6 +97,12 @@ void godot::RollbackManager::_process(double delta)
     //Frame start
     emit_signal("onFrameStart");
 
+    if(doreset)
+    {
+        onResetGameState();
+        doreset = false;
+    }
+
     //Handle frame Inputs
     onHandleInput(_inputs[_frameNumber]);
 
@@ -102,8 +113,10 @@ void godot::RollbackManager::_process(double delta)
     emit_signal("onFrameEnd", delta);
 
     //Store current frame state
+    _savedFrames.emplace(FrameState(_inputs[_frameNumber], _currentGameState, _frameNumber));
 
     //Remove oldest frame state
+    _savedFrames.pop();
 
     //Progress frame number
     _frameNumber >= 255 ? _frameNumber = 0 : ++_frameNumber;
@@ -139,12 +152,33 @@ void godot::RollbackManager::addToGameState(const String &name, const PackedByte
     GameState::ElementBufferData elementData;
     elementData.index = _currentGameState.stateBuffer.size();
     elementData.size = data.size();
+    _currentGameState.elementsIds.push_back(name);
 
-    //UtilityFunctions::print("Added element with name: ", name, " Index: ", elementData.index, " Size: ", elementData.size);
+    
     _currentGameState.elementsSaved.insert(name, std::move(elementData));
       
 
     //Add data to buffer
    _currentGameState.stateBuffer.append_array(data);
-   //UtilityFunctions::print("Current Game State Buffer Size: ", _currentGameState.stateBuffer.size());
+   
+  // UtilityFunctions::print("Current Game State Buffer Size: ", _currentGameState.stateBuffer.size());
+}
+
+void godot::RollbackManager::onResetGameState()
+{
+    const auto& oldGameState = _savedFrames.front().frameGameState;
+
+    UtilityFunctions::print("buffer: ", oldGameState.stateBuffer);
+
+    int acumulatedBufferSize = 0;
+    auto& it = oldGameState.elementsSaved.begin();
+    for(; it != oldGameState.elementsSaved.end(); ++it)
+    {      
+        acumulatedBufferSize += it->value.size;
+
+        UtilityFunctions::print(oldGameState.stateBuffer.slice(it->value.index, acumulatedBufferSize));
+        emit_signal("onResetState", it->key, oldGameState.stateBuffer.slice(it->value.index, acumulatedBufferSize));
+    }
+
+
 }
