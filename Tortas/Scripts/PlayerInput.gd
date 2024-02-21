@@ -22,12 +22,9 @@ func _ready():
 	speedStrength = 0;
 	pass # Replace with function body.
 
-# Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(delta):
-	
-	pass
-
+var frame : int = 0
 func _on_rollback_manager_on_frame_update(delta):
+	
 	if(abs(speedStrength) < 0.2):
 		currentSpeed -= (currentSpeed * friction) * delta
 	else:
@@ -41,10 +38,13 @@ func _on_rollback_manager_on_frame_update(delta):
 
 
 func _on_rollback_manager_on_handle_input(action, value):
-	
+	print("---------------------------------------------------------")
 	#Not the way but simplpifies code
-	if(action == "LLHorizontal" or action == "LRHorizontal"):
-		speedStrength = Input.get_axis("LLHorizontal","LRHorizontal")
+	if(action == "LLHorizontal"):
+		speedStrength = -value		
+	else:
+		if(action == "LRHorizontal" and value != 0.0):
+			speedStrength = value
 	
 	pass # Replace with function body.
 
