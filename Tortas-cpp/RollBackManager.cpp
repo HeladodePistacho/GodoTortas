@@ -57,10 +57,10 @@ void godot::RollbackManager::_ready()
         _inputs.push_back(newInputState);
     }
 
-    //Init freame states
-    //for(int i = 0; i < _numRollbackFrames; ++i)
+    //Init frame states
+    for(int i = 0; i < _numRollbackFrames; ++i)
     {
-    //    _savedFrames.emplace(InputState(), GameState(), 0);
+        _savedFrames.emplace(InputState(), GameState(), 0);
     }
 }
 
@@ -115,10 +115,10 @@ void godot::RollbackManager::_physics_process(double delta)
     emit_signal("onFrameEnd", delta);
 
     //Store current frame state
-    //_savedFrames.emplace(FrameState(_inputs[_frameNumber], _currentGameState, _frameNumber));
+    _savedFrames.emplace(FrameState(*_inputs[_frameNumber].ptr(), *_currentGameState.ptr(), _frameNumber));
 
     //Remove oldest frame state
-    //_savedFrames.pop();
+    _savedFrames.pop();
 
     //Progress frame number
     _frameNumber >= 255 ? _frameNumber = 0 : ++_frameNumber;

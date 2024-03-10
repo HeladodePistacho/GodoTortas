@@ -18,6 +18,7 @@
 
 #include "InputState.h"
 #include "GameState.h"
+#include "FrameState.h"
 
 namespace godot
 {
@@ -26,26 +27,6 @@ namespace godot
         WAITING = 0,    //Waiting to connect to peer
         END,            //Conection finished
         CONNECTED       //Connected to another pier
-    };
-
-  
-
-    
-    
-
-    struct FrameState
-    {
-        InputState frameInputs{};
-        GameState frameGameState{};
-        int frameIndex = 0;
-
-        FrameState(const InputState& inputs, const GameState& gameState, int frame) : 
-        frameInputs(inputs),
-        frameGameState(gameState),
-        frameIndex(frame)
-        {
-            
-        }
     };
 
     class RollbackManager : public Node 
