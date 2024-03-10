@@ -4,6 +4,7 @@
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/input_event.hpp>
 #include <godot_cpp/classes/packet_peer_udp.hpp>
+#include <godot_cpp/templates/local_vector.hpp>
 #include <godot_cpp/templates/vector.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/templates/hash_map.hpp>
@@ -13,57 +14,19 @@
 #include <vector>
 #include <string>
 #include <queue>
+#include <godot_cpp/classes/thread.hpp>
+#include "InputState.h"
 
 namespace godot
 {
-    //This will hold the input state of each frame
-    struct InputState
+    enum class NET_STATE
     {
-        public:
-        TypedArray<String> actions;
-        TypedArray<float> values;
-
-        InputState() = default;
-
-        // Copy constructor
-        InputState(const InputState& other) : 
-        actions(other.actions),
-        values(other.values)
-        {}
-
-        // Move constructor
-        InputState(InputState&& other) noexcept : 
-        actions(std::move(other.actions)),
-        values(std::move(other.values))
-        {}
-
-        InputState& operator=(const InputState& other) noexcept
-        {
-            if (this != &other) 
-            {
-                actions = other.actions;
-                values = other.values;
-            }
-            return *this;
-        }
-
-        // Move assignment operator
-        InputState& operator=(InputState&& other) noexcept
-        {
-            if (this != &other) 
-            {
-                actions = std::move(other.actions);
-                values = std::move(other.values);
-            }
-            return *this;
-        }
-
-        void reset()
-        {
-            actions.clear();
-            values.clear();
-        }
+        WAITING = 0,    //Waiting to connect to peer
+        END,            //Conection finished
+        CONNECTED       //Connected to another pier
     };
+
+  
 
     
     struct GameState
@@ -142,15 +105,22 @@ namespace godot
         int _frameNumber = 0;
 
         //Inputs will cycle between 0-256
-        std::vector<InputState> _inputs;
+        Vector<Ref<InputState>> _inputs;
 
         //Queue with saved frames
         std::queue<FrameState> _savedFrames;
 
-        InputState _currentInputState{};
-        GameState _currentGameState{};
+        Ref<InputState> _currentInputState;
+        //GameState _currentGameState{};
 
         bool doreset = false;
+/*
+        // Net
+        NET_STATE connectionState = NET_STATE::WAITING;
+        String stateDetails;
+        PacketPeerUDP udpPeer;
+        Thread netThread;*/
+
     protected:
 	    static void _bind_methods();
 
@@ -162,14 +132,12 @@ namespace godot
         void _unhandled_input(const Ref<InputEvent>& event) override;
         void _physics_process(double delta) override;
 
-        void onHandleInput(const InputState& inputs);
+        void onHandleInput(const Ref<InputState> inputs);
 
-        GameState& getCurrentGameState();
+        /*GameState& getCurrentGameState();
         void addToGameState(const String &name, const PackedByteArray& data);
         void onResetGameState();
-
-        bool test = true;
-
+      
         void setDelay(const int delay)
         {
             _processInputDelay = delay;
@@ -188,7 +156,7 @@ namespace godot
         int getRollFrames() const
         {
             return _numRollbackFrames;
-        }
+        }*/
     };
 }
 

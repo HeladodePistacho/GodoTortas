@@ -7,12 +7,14 @@
 script = ExtResource("1_41j4q")
 
 [node name="RollbackManager" type="RollbackManager" parent="."]
-_processInputDelay = 4
+process_mode = 4
 
 [node name="Character" parent="." node_paths=PackedStringArray("rollbackManager") instance=ExtResource("1_ellkx")]
 position = Vector2(530, 351)
 rollbackManager = NodePath("../RollbackManager")
-maxSpeed = 100
+walkSpeedStrenght = 2.0
+acceleration = 40
+maxSpeed = 400
 dashSpeed = 1000
 
 [connection signal="onFrameUpdate" from="RollbackManager" to="Character" method="_on_rollback_manager_on_frame_update"]

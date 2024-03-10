@@ -2,11 +2,13 @@ extends Node2D
 
 @export var rollbackManager : RollbackManager
 
+@export var walkSpeedStrenght: float = 1.0;
 @export var acceleration = 2;
 @export var friction: float = 1.0 
 @export var maxSpeed = 10;
 @export var dashSpeed = 0;
 
+var dirInputCurrentFrame: bool = false
 const speedThreshold = 1;
 var dash: bool = false;
 var currentSpeed: float;
@@ -15,7 +17,7 @@ var test = 0;
 
 var positionSize : int = var_to_bytes(position).size()
 var speedSize : int = var_to_bytes(currentSpeed).size()
-
+var tessssdsdt = 0
 # Called when the node enters the scene tree for the first time.
 func _ready():
 	currentSpeed = 0;
@@ -28,7 +30,7 @@ func _on_rollback_manager_on_frame_update(delta):
 	if(abs(speedStrength) < 0.2):
 		currentSpeed -= (currentSpeed * friction) * delta
 	else:
-		currentSpeed = clamp(currentSpeed + ((speedStrength * acceleration) * delta), -maxSpeed, maxSpeed);
+		currentSpeed = clamp(currentSpeed + ((speedStrength * acceleration)), -maxSpeed, maxSpeed);
 	
 	if(abs(currentSpeed) < speedThreshold):
 		currentSpeed = 0;
@@ -37,20 +39,20 @@ func _on_rollback_manager_on_frame_update(delta):
 	pass # Replace with function body.
 
 
-func _on_rollback_manager_on_handle_input(action, value):
-	print("---------------------------------------------------------")
-	#Not the way but simplpifies code
+func _on_rollback_manager_on_handle_input(action, value):	
+	#This code asumes this 2 actions are exclusive one is positive when the other one is 0
 	if(action == "LLHorizontal"):
-		speedStrength = -value		
-	else:
-		if(action == "LRHorizontal" and value != 0.0):
-			speedStrength = value
+		speedStrength = -walkSpeedStrenght if(value != 0.0) else 0.0
+			
+	if(action == "LRHorizontal"):
+		if(value != 0):
+			speedStrength = walkSpeedStrenght
 	
-	pass # Replace with function body.
+	pass
 
 func _on_rollback_manager_on_save_game_state():
 
-	var gameState : PackedByteArray
+	var gameState : PackedByteArray = PackedByteArray()
 	gameState += var_to_bytes(position)
 	gameState += var_to_bytes(floorf(currentSpeed))
 	
