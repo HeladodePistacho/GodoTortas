@@ -3,6 +3,7 @@
 #include "InputBuffer.h"
 #include "RollBackManager.h"
 #include "InputState.h"
+#include "GameState.h"
 #include "Test.h"
 
 #include <gdextension_interface.h>
@@ -23,6 +24,7 @@ void initialize_example_module(ModuleInitializationLevel p_level) {
 		ClassDB::register_class<RollbackManager>();
 		ClassDB::register_class<CustomInput>();
 		ClassDB::register_class<InputState>();
+		ClassDB::register_class<GameState>();
 	}
 
 	//ClassDB::register_class<InputBuffer>();

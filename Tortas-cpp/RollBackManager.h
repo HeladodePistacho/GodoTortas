@@ -6,8 +6,8 @@
 #include <godot_cpp/classes/packet_peer_udp.hpp>
 #include <godot_cpp/templates/local_vector.hpp>
 #include <godot_cpp/templates/vector.hpp>
-#include <godot_cpp/variant/packed_byte_array.hpp>
-#include <godot_cpp/templates/hash_map.hpp>
+
+
 #include <godot_cpp/templates/hash_set.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <unordered_map>
@@ -15,7 +15,9 @@
 #include <string>
 #include <queue>
 #include <godot_cpp/classes/thread.hpp>
+
 #include "InputState.h"
+#include "GameState.h"
 
 namespace godot
 {
@@ -29,55 +31,7 @@ namespace godot
   
 
     
-    struct GameState
-    {
-        struct ElementBufferData
-        {
-            int index = 0;
-            int size = 0;
-        };
-
-        HashMap<String /*Name*/, ElementBufferData> elementsSaved;
-        TypedArray<String> elementsIds;
-        PackedByteArray stateBuffer;
-
-        GameState() = default;
-
-        // Copy Constructor
-        GameState(const GameState& other) : elementsSaved(other.elementsSaved), stateBuffer(other.stateBuffer), elementsIds(other.elementsIds) {}
-
-        // Move Constructor
-        GameState(GameState&& other) noexcept : elementsSaved(std::move(other.elementsSaved)), stateBuffer(std::move(other.stateBuffer)), elementsIds(std::move(other.elementsIds)) {}
-
-        // Copy Assignment Operator
-        GameState& operator=(const GameState& other) 
-        {
-            if (this != &other) {
-                elementsSaved = other.elementsSaved;
-                stateBuffer = other.stateBuffer;
-                elementsIds = other.elementsIds;
-            }
-            return *this;
-        }
-
-        // Move Assignment Operator
-        GameState& operator=(GameState&& other) noexcept 
-        {
-            if (this != &other) {
-                elementsSaved = std::move(other.elementsSaved);
-                stateBuffer = std::move(other.stateBuffer);
-                elementsIds = std::move(other.elementsIds);
-            }
-            return *this;
-        }
-
-        void reset()
-        {
-            elementsSaved.clear();
-            elementsIds.clear();
-            stateBuffer.clear();
-        }
-    };
+    
 
     struct FrameState
     {
@@ -111,7 +65,7 @@ namespace godot
         std::queue<FrameState> _savedFrames;
 
         Ref<InputState> _currentInputState;
-        //GameState _currentGameState{};
+        Ref<GameState> _currentGameState;
 
         bool doreset = false;
 /*
@@ -132,12 +86,14 @@ namespace godot
         void _unhandled_input(const Ref<InputEvent>& event) override;
         void _physics_process(double delta) override;
 
+        //Input
         void onHandleInput(const Ref<InputState> inputs);
 
-        /*GameState& getCurrentGameState();
+        //Game state 
         void addToGameState(const String &name, const PackedByteArray& data);
         void onResetGameState();
       
+        //Properties
         void setDelay(const int delay)
         {
             _processInputDelay = delay;
@@ -156,7 +112,7 @@ namespace godot
         int getRollFrames() const
         {
             return _numRollbackFrames;
-        }*/
+        }
     };
 }
 

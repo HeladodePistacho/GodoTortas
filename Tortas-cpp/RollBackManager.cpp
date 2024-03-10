@@ -10,7 +10,7 @@ using namespace godot;
 void RollbackManager::_bind_methods()
 {
     //Properties
-    /*ClassDB::bind_method(D_METHOD("getDelay"), &RollbackManager::getDelay);
+    ClassDB::bind_method(D_METHOD("getDelay"), &RollbackManager::getDelay);
 	ClassDB::bind_method(D_METHOD("setDelay", "delay"), &RollbackManager::setDelay);
     ClassDB::bind_method(D_METHOD("getRollFrames"), &RollbackManager::getRollFrames);
 	ClassDB::bind_method(D_METHOD("setRollFrames", "rollFrames"), &RollbackManager::setRollFrames);
@@ -18,7 +18,7 @@ void RollbackManager::_bind_methods()
     ClassDB::add_property("RollbackManager", PropertyInfo(Variant::INT, "_numRollbackFrames", PROPERTY_HINT_RANGE, "1,120"), "setRollFrames", "getRollFrames");
 
     //Methods
-    ClassDB::bind_method(D_METHOD("addToGameState", "name", "data"), &RollbackManager::addToGameState);*/
+    ClassDB::bind_method(D_METHOD("addToGameState", "name", "data"), &RollbackManager::addToGameState);
 
     //Signals
     ADD_SIGNAL(MethodInfo("onSaveGameState"));
@@ -30,7 +30,7 @@ void RollbackManager::_bind_methods()
     ADD_SIGNAL(MethodInfo("onResetState", PropertyInfo(Variant::STRING, "element"), PropertyInfo(Variant::PACKED_BYTE_ARRAY, "gameState")));
 }
 
-RollbackManager::RollbackManager() : _currentInputState(memnew(InputState))
+RollbackManager::RollbackManager() : _currentInputState(memnew(InputState)), _currentGameState(memnew(GameState))
 {
 
 }
@@ -92,19 +92,18 @@ void godot::RollbackManager::_physics_process(double delta)
     futureInputState->localInputs.values.append_array(_currentInputState->localInputs.values);
     _currentInputState->reset();
 
-
     //Create Game State
-    //_currentGameState.reset();
-//    emit_signal("onSaveGameState");
+    _currentGameState->reset();
+    emit_signal("onSaveGameState");
 
     //Frame start
-//    emit_signal("onFrameStart");
+    emit_signal("onFrameStart");
 
-    //if(doreset)
-    //{
-    //    onResetGameState();
-    //    doreset = false;
-    //}
+    if(doreset)
+    {
+        onResetGameState();
+        doreset = false;
+    }
 
     //Handle frame Inputs
     onHandleInput(_inputs[_frameNumber]);
@@ -138,33 +137,24 @@ void godot::RollbackManager::onHandleInput(const Ref<InputState> inputs)
     }
 }
 
-/*GameState& godot::RollbackManager::getCurrentGameState()
-{
-    return GameState();
-}
-
 void godot::RollbackManager::addToGameState(const String &name, const PackedByteArray& data)
 {
-    //if(_currentGameState.elementsSaved.has(name))
-    //{
+    if(_currentGameState->elementsSaved.has(name))
+    {
     //    UtilityFunctions::print("You already have this element in the current game state");
-    //    return;
-    //}
+       return;
+    }
 
     //Add element to saved elements
-   // GameState::ElementBufferData elementData;
-    //elementData.index = _currentGameState.stateBuffer.size();
-    //elementData.size = data.size();
-   // _currentGameState.elementsIds.push_back(name);
+    GameState::ElementBufferData elementData;
+    elementData.index = _currentGameState->stateBuffer.size();
+    elementData.size = data.size();
 
-    
-   // _currentGameState.elementsSaved.insert(name, std::move(elementData));
-      
+    _currentGameState->elementsIds.push_back(name); 
+    _currentGameState->elementsSaved.insert(name, std::move(elementData));
 
     //Add data to buffer
-   //_currentGameState.stateBuffer.append_array(data);
-   
-  // UtilityFunctions::print("Current Game State Buffer Size: ", _currentGameState.stateBuffer.size());
+   _currentGameState->stateBuffer.append_array(data);
 }
 
 void godot::RollbackManager::onResetGameState()
@@ -184,4 +174,4 @@ void godot::RollbackManager::onResetGameState()
     }
 
 
-}*/
+}
