@@ -24,9 +24,6 @@ void initialize_example_module(ModuleInitializationLevel p_level) {
 	{
 		ClassDB::register_class<RollbackManager>();
 		ClassDB::register_class<CustomInput>();
-		ClassDB::register_class<InputState>();
-		ClassDB::register_class<GameState>();
-		ClassDB::register_class<FrameState>();
 	}
 
 	//ClassDB::register_class<InputBuffer>();

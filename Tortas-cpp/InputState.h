@@ -20,17 +20,13 @@ namespace godot {
     };
 
     //This will hold the input state of each frame
-    class InputState : public RefCounted
+    class InputState
     {        
-        GDCLASS(InputState, RefCounted)
-        protected:
-	        static void _bind_methods();
-
         public:
         InputElement localInputs;
         InputElement netInputs;
 
-        InputState() = default;
+        InputState();
         ~InputState();
 
         // Copy constructor

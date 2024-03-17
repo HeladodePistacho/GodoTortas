@@ -3,13 +3,14 @@
 
 using namespace godot;
 
-void InputState::_bind_methods()
+godot::InputState::InputState()
 {
+
 }
 
 InputState::~InputState()
 {
-    UtilityFunctions::print("~InputState()");
+
 }
 
 InputState::InputState(const InputState &other) : localInputs(other.localInputs)

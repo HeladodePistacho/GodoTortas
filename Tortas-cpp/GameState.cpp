@@ -1,6 +1,12 @@
 #include "GameState.h"
+#include <godot_cpp/variant/utility_functions.hpp>
 
-void godot::GameState::_bind_methods()
+godot::GameState::GameState()
 {
-    
+
+}
+
+godot::GameState::~GameState()
+{
+
 }

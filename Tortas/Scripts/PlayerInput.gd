@@ -56,9 +56,8 @@ func _on_rollback_manager_on_save_game_state():
 	gameState += var_to_bytes(position)
 	gameState += var_to_bytes(floorf(currentSpeed))
 	
-	print(name, gameState)
 	rollbackManager.addToGameState(name, gameState)
-	print("?")
+
 	pass # Replace with function body.
 
 func _on_rollback_manager_on_reset_state(element, gameState : PackedByteArray):

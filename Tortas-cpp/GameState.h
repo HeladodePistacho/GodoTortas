@@ -9,13 +9,9 @@
 
 namespace godot {
 
-    class GameState : public RefCounted
+    class GameState
     {
-        GDCLASS(GameState, RefCounted)
-        protected:
-	        static void _bind_methods();
         public:
-
         struct ElementBufferData
         {
             int index = 0;
@@ -26,7 +22,8 @@ namespace godot {
         TypedArray<String> elementsIds;
         PackedByteArray stateBuffer;
 
-        GameState() = default;
+        GameState();
+        ~GameState();
 
         // Copy Constructor
         GameState(const GameState& other) : elementsSaved(other.elementsSaved), stateBuffer(other.stateBuffer), elementsIds(other.elementsIds) {}
@@ -35,15 +32,15 @@ namespace godot {
         GameState(GameState&& other) noexcept : elementsSaved(std::move(other.elementsSaved)), stateBuffer(std::move(other.stateBuffer)), elementsIds(std::move(other.elementsIds)) {}
 
         // Copy Assignment Operator
-        //GameState& operator=(const GameState& other) 
-        //{
-        //    if (this != &other) {
-        //        elementsSaved = other.elementsSaved;
-        //        stateBuffer = other.stateBuffer;
-        //        elementsIds = other.elementsIds;
-        //    }
-        //    return *this;
-        //}
+        GameState& operator=(const GameState& other) 
+        {
+            if (this != &other) {
+                elementsSaved = other.elementsSaved;
+                stateBuffer = other.stateBuffer;
+                elementsIds = other.elementsIds;
+            }
+            return *this;
+        }
 
         // Move Assignment Operator
         GameState& operator=(GameState&& other) noexcept 
