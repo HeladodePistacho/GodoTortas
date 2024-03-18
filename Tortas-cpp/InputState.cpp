@@ -33,6 +33,14 @@ InputState& InputState::operator=(InputState&& other) noexcept
     return *this;
 }
 
+void godot::InputState::copy(const InputState &other)
+{
+    reset();
+    localInputs.actions.append_array(other.localInputs.actions);
+    localInputs.values.append_array(other.localInputs.values);
+    localInputs.encodedValue  = other.localInputs.encodedValue;
+}
+
 void godot::InputState::reset()
 {    
     localInputs.reset();

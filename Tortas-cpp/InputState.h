@@ -11,11 +11,13 @@ namespace godot {
     {
         TypedArray<String> actions;
         TypedArray<float> values;
+        unsigned char encodedValue = 0;
 
         void reset() 
         {
             actions.clear();
             values.clear();
+            encodedValue = 0;
         }
     };
 
@@ -38,6 +40,7 @@ namespace godot {
         // Move assignment operator
         InputState& operator=(InputState&& other) noexcept;
 
+        void copy(const InputState& other);
         void reset();
     };
 };

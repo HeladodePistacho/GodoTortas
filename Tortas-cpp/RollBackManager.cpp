@@ -22,7 +22,8 @@ void godot::RollbackManager::netInputThreadFunc()
         if(netInData.is_empty())
             continue;
 
-        UtilityFunctions::print("Ireceived a packet, frame: ", netInData[0]);
+        UtilityFunctions::print("Ireceived a packet, frame: ", netInData[0], " Input: ", netInData[1]);
+        //UtilityFunctions::print("Ireceived a packet, frame: ", netInData[0]);
     }
 }
 
@@ -97,6 +98,7 @@ void godot::RollbackManager::_ready()
 
 void RollbackManager::_unhandled_input(const Ref<InputEvent> &event)
 {
+    int inputBit = 1;
     for(const String& action : CustomInput::_customActions)
     {
         if(!event->is_action(action))
@@ -104,7 +106,15 @@ void RollbackManager::_unhandled_input(const Ref<InputEvent> &event)
             continue;
         }        
         _currentInputState.localInputs.actions.push_back(action);
-        _currentInputState.localInputs.values.push_back(event->get_action_strength(action));
+        double value = event->get_action_strength(action);
+        _currentInputState.localInputs.values.push_back(value);
+        
+        if(Math::floor(value) != 0.0)
+        {
+            _currentInputState.localInputs.encodedValue += inputBit;
+        }
+        
+        inputBit *= 2;
     }
 
     if(event->is_action_pressed("test"))
@@ -118,9 +128,7 @@ void godot::RollbackManager::_physics_process(double delta)
 {
     //Process Inputs
     InputState& futureInputState = _inputs[(_frameNumber + _processInputDelay) % 256];
-    futureInputState.reset();
-    futureInputState.localInputs.actions.append_array(_currentInputState.localInputs.actions);
-    futureInputState.localInputs.values.append_array(_currentInputState.localInputs.values);
+    futureInputState.copy(_currentInputState);
     _currentInputState.reset();
 
     //Create Game State
@@ -151,10 +159,9 @@ void godot::RollbackManager::_physics_process(double delta)
     //Remove oldest frame state
     _savedFrames.pop();
 
-
     PackedByteArray netData{};
     netData.append(_frameNumber);
-    netData.append(_frameNumber);
+    netData.append(futureInputState.localInputs.encodedValue);
 
     Error packetError = _socketUdp->put_packet(netData);
     if(packetError != Error::OK)
