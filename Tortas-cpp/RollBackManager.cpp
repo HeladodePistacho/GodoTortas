@@ -14,78 +14,6 @@ using namespace godot;
 //    int port = 8843;
 //}
 
-void godot::RollbackManager::netInputThreadFunc()
-{    
-    while(true)
-    {
-        PackedByteArray netInData = _socketUdp->get_packet();
-
-        if(netInData.is_empty())
-            continue;
-       
-        NET_PACKET_TYPE netInputType = (NET_PACKET_TYPE)netInData[0];
-        switch(netInputType)
-        {
-            case NET_PACKET_TYPE::INPUT:
-            {
-                //Get frame net input
-                int netFrame = netInData[1];                
-                //if(_inputArrivedPerFrame[netFrame] == true)
-                //{
-                    //We already have input for this frame
-                //    break;
-                //}
-                UtilityFunctions::print("Data received: ");
-                for(int i = 0; i < netInData.size(); ++i)
-                {
-                    UtilityFunctions::print(netInData[i]);
-                }
-                
-
-                int netEncodedInput = netInData[2];
-                unsigned char inputBit = 1; 
-                InputState& frameInputState = _inputs[netFrame];
-
-                _inputArrivedMutex->lock();
-                for(const String& action : CustomInput::_customActions)
-                {           
-                    float decodedValue = 0.0f;
-                    if(netEncodedInput & inputBit)
-                    {
-                        decodedValue = 1.0f;
-                    }
-
-                    //needs mutex (probably)
-                    frameInputState.netInputs.actions.insert(action, decodedValue);
-                    inputBit *= 2;
-                }
-                _inputArrivedPerFrame[netFrame] = true;
-                _inputArrivedMutex->unlock();
-
-                _inputReceivedMutex->lock();
-                _inputReceived = true;
-                if(_connectionState == NET_STATE::WAITING)
-                {
-                    _connectionState = NET_STATE::CONNECTED;
-                }
-                _inputReceivedMutex->unlock();
-
-                break;
-            }
-            case NET_PACKET_TYPE::INPUT_REQUESTED:
-                break;
-            case NET_PACKET_TYPE::HANDSHAKE:
-                break;
-            case NET_PACKET_TYPE::GAME_END:
-                break;
-        }
-        
-
-               
-    
-    }
-}
-
 void RollbackManager::_bind_methods()
 {
     //Properties
@@ -147,7 +75,7 @@ void godot::RollbackManager::_ready()
 
     //Start Net
     _socketUdp.instantiate();
-    _inputArrivedMutex.instantiate();
+    _inputArrayMutex.instantiate();
     _inputRequestMutex.instantiate();
     _inputReceivedMutex.instantiate();
     _netThread.instantiate();
@@ -175,9 +103,13 @@ void godot::RollbackManager::_physics_process(double delta)
     //Process Inputs
     getCurrentInput();
 
+    _inputArrayMutex->lock();
     InputState& futureInputState = _inputs[(_frameNumber + _processInputDelay) % 256];
     futureInputState.copy(_currentInputState);
     _currentInputState.reset();
+
+    sendInputPacket(futureInputState);
+    _inputArrayMutex->unlock();
 
     //Create Game State
     _currentGameState.reset();
@@ -202,9 +134,7 @@ void godot::RollbackManager::_physics_process(double delta)
     emit_signal("onFrameEnd", delta);
 
     //Store current frame state
-    _savedFrames.emplace(FrameState(_inputs[_frameNumber], _currentGameState, _frameNumber));
-
-    sendInputPacket(futureInputState);
+    _savedFrames.emplace(FrameState(_inputs[_frameNumber], _currentGameState, _frameNumber));   
 
     //Remove oldest frame state
     _savedFrames.pop();
@@ -284,6 +214,37 @@ Error godot::RollbackManager::initializeUDPSocket()
     return ret;
 }
 
+void godot::RollbackManager::netInputThreadFunc()
+{    
+    while(true)
+    {
+        PackedByteArray netInData = _socketUdp->get_packet();
+
+        if(netInData.is_empty())
+            continue;
+       
+        NET_PACKET_TYPE netInputType = (NET_PACKET_TYPE)netInData[0];
+        switch(netInputType)
+        {
+            case NET_PACKET_TYPE::INPUT:
+            {                
+                processInputPacket(netInData);
+                break;
+            }
+            case NET_PACKET_TYPE::INPUT_REQUESTED:
+                break;
+            case NET_PACKET_TYPE::HANDSHAKE:
+                break;
+            case NET_PACKET_TYPE::GAME_END:
+                break;
+        }
+        
+
+               
+    
+    }
+}
+
 void godot::RollbackManager::sendInputPacket(const InputState& inputToSend)
 {
     PackedByteArray netData{};
@@ -301,10 +262,58 @@ void godot::RollbackManager::sendInputPacket(const InputState& inputToSend)
         netData.append((unsigned char)frameToSend);
         netData.append(_inputs[frameToSend].localInputs.encodedValue);
     }
-        
-    Error packetError = _socketUdp->put_packet(netData);
-    if(packetError != Error::OK)
+    
+    //Send the packet multiple times to help with UDP unreliavility
+    for(int i = 0; i < _packetSentAmount; ++i)
     {
-        UtilityFunctions::print("[Error] UDP.put_packet failed ErrorType: ", packetError);
+        Error packetError = _socketUdp->put_packet(netData);
+        if(packetError != Error::OK)
+        {
+            UtilityFunctions::print("[Error] UDP.put_packet failed ErrorType: ", packetError);
+        }
+    }    
+}
+
+void godot::RollbackManager::processInputPacket(const PackedByteArray &netData)
+{
+    //Packet Structure
+    // NET_PACKET_TYPE::INPUT + Frame 0 + Frame 0 input + Frame 1 + Frame 1 input...            
+    int packetIndex = 1;
+    _inputArrayMutex->lock();
+    while(packetIndex < netData.size())
+    {
+        int netEncodedInput = netData[packetIndex + 1];
+        int netFrame = netData[packetIndex];
+        if(_inputArrivedPerFrame[netFrame] == true)
+        {
+            //We already have input for this frame
+            break;
+        }
+
+        unsigned char inputBit = 1; 
+        InputState& frameInputState = _inputs[netFrame];                    
+        for(const String& action : CustomInput::_customActions)
+        {           
+            float decodedValue = 0.0f;
+            if(netEncodedInput & inputBit)
+            {
+                decodedValue = 1.0f;
+            }
+
+            frameInputState.netInputs.actions.insert(action, decodedValue);
+            inputBit *= 2;                        
+        }
+        _inputArrivedPerFrame[netFrame] = true;  
+        packetIndex += 2;                  
+    }            
+    _inputArrayMutex->unlock();
+
+
+    _inputReceivedMutex->lock();
+    _inputReceived = true;
+    if(_connectionState == NET_STATE::WAITING)
+    {
+        _connectionState = NET_STATE::PLAYING;
     }
+    _inputReceivedMutex->unlock();
 }

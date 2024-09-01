@@ -72,7 +72,7 @@ namespace godot
         Ref<Thread> _netThread;
 
         bool _inputArrivedPerFrame[256]; //Tracks if an input has arrived for frame X
-        Ref<Mutex> _inputArrivedMutex;
+        Ref<Mutex> _inputArrayMutex;
 
         bool _inputRequestPerFrame[256]; //Tracks if local inputs for a given frame are ready to be sent by request
         Ref<Mutex> _inputRequestMutex;
@@ -82,12 +82,13 @@ namespace godot
         
         //frame range of past inputs to send every frame
         int _frameSendRange = 5;
-        
+
         //amount of input packets to send per frame
         int _packetSentAmount = 3;
 
         void netInputThreadFunc();
         void sendInputPacket(const InputState& inputToSend);
+        void processInputPacket(const PackedByteArray& netData);
         bool _newInputsInCurrentFrame = false;
 
 
