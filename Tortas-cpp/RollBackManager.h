@@ -30,13 +30,13 @@ namespace godot
     {
         WAITING = 0,    //Waiting to connect to peer
         END,            //Conection finished
-        CONNECTED       //Connected to another peer
+        PLAYING       //Connected to another peer
     };
 
     enum class NET_PACKET_TYPE : unsigned char
     {
         INPUT = 0,
-        INPUT_REQUESTED,
+        INPUT_REQUEST,
         HANDSHAKE,
         GAME_END
     };
@@ -74,7 +74,7 @@ namespace godot
         bool _inputArrivedPerFrame[256]; //Tracks if an input has arrived for frame X
         Ref<Mutex> _inputArrayMutex;
 
-        bool _inputRequestPerFrame[256]; //Tracks if local inputs for a given frame are ready to be sent by request
+        bool _inputRequestAvailablePerFrame[256]; //Tracks if local inputs for a given frame are ready to be sent by request
         Ref<Mutex> _inputRequestMutex;
         
         bool _inputReceived = false; //boolean to communicate between threads if new inputs have been received
@@ -88,7 +88,9 @@ namespace godot
 
         void netInputThreadFunc();
         void sendInputPacket(const InputState& inputToSend);
+        void sendInputPacket(int frameNeededStart);
         void processInputPacket(const PackedByteArray& netData);
+        void processRequestPacket(const PackedByteArray& netData);
         bool _newInputsInCurrentFrame = false;
 
 

@@ -65,6 +65,7 @@ void godot::RollbackManager::_ready()
     {
         _inputs.push_back(InputState{});
         _inputArrivedPerFrame[i] = false;
+        _inputRequestAvailablePerFrame[i] = false;
     }
 
     //Init frame states
@@ -231,8 +232,11 @@ void godot::RollbackManager::netInputThreadFunc()
                 processInputPacket(netInData);
                 break;
             }
-            case NET_PACKET_TYPE::INPUT_REQUESTED:
+            case NET_PACKET_TYPE::INPUT_REQUEST:
+            {
+                processRequestPacket(netInData);
                 break;
+            }
             case NET_PACKET_TYPE::HANDSHAKE:
                 break;
             case NET_PACKET_TYPE::GAME_END:
@@ -250,9 +254,8 @@ void godot::RollbackManager::sendInputPacket(const InputState& inputToSend)
     PackedByteArray netData{};
     netData.append((unsigned char)NET_PACKET_TYPE::INPUT);
 
-    int frameToSend = ((_frameNumber + _processInputDelay) % 256);
-
     //Add the current frame and previous frames to help with UDP missing packets
+    int frameToSend = ((_frameNumber + _processInputDelay) % 256);
     for(int i = 0; i < _frameSendRange; --frameToSend, ++i)
     {
         if(frameToSend < 0)
@@ -272,6 +275,24 @@ void godot::RollbackManager::sendInputPacket(const InputState& inputToSend)
             UtilityFunctions::print("[Error] UDP.put_packet failed ErrorType: ", packetError);
         }
     }    
+}
+
+void godot::RollbackManager::sendInputPacket(int frameNeeded)
+{
+    PackedByteArray netData{};
+    netData.append((unsigned char)NET_PACKET_TYPE::INPUT);
+    netData.append((unsigned char)frameNeeded);
+    netData.append(_inputs[frameNeeded].localInputs.encodedValue);
+
+    //Send the packet multiple times to help with UDP unreliavility
+    for(int i = 0; i < _packetSentAmount; ++i)
+    {
+        Error packetError = _socketUdp->put_packet(netData);
+        if(packetError != Error::OK)
+        {
+            UtilityFunctions::print("[Error] UDP.put_packet failed ErrorType: ", packetError);
+        }
+    } 
 }
 
 void godot::RollbackManager::processInputPacket(const PackedByteArray &netData)
@@ -317,3 +338,27 @@ void godot::RollbackManager::processInputPacket(const PackedByteArray &netData)
     }
     _inputReceivedMutex->unlock();
 }
+
+void godot::RollbackManager::processRequestPacket(const PackedByteArray &netData)
+{
+    //Packet Structure
+    // NET_PACKET_TYPE::REQUEST + Frame X + Frame Y
+    // Requested frames from X to Y (Not inclusive)
+    _inputRequestMutex->lock();
+    _inputArrayMutex->lock();
+    for(int frame = netData[1]; frame != netData[2];)
+    {
+        if(!_inputRequestAvailablePerFrame[frame])
+        {
+            //We break because if we don't have input for that frame
+            //future frames should be empty (if not ¯\_(ツ)_/¯)
+            break;
+        }
+
+        sendInputPacket(frame);
+        frame = (frame + 1) % 256;
+    }
+    _inputArrayMutex->unlock();
+    _inputRequestMutex->unlock();
+}
+
