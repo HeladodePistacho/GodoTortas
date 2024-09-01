@@ -4,6 +4,7 @@
 #include <godot_cpp/classes/engine.hpp>
 #include "InputBuffer.h"
 #include <godot_cpp/classes/ref_counted.hpp>
+#include <godot_cpp/classes/input.hpp>
 
 using namespace godot;
 
@@ -21,9 +22,62 @@ void godot::RollbackManager::netInputThreadFunc()
 
         if(netInData.is_empty())
             continue;
+       
+        NET_PACKET_TYPE netInputType = (NET_PACKET_TYPE)netInData[0];
+        switch(netInputType)
+        {
+            case NET_PACKET_TYPE::INPUT:
+            {
+                //Get frame net input
+                int netFrame = netInData[1];                
+                //if(_inputArrivedPerFrame[netFrame] == true)
+                //{
+                    //We already have input for this frame
+                //    break;
+                //}
 
-        UtilityFunctions::print("Ireceived a packet, frame: ", netInData[0], " Input: ", netInData[1]);
-        //UtilityFunctions::print("Ireceived a packet, frame: ", netInData[0]);
+
+                int netEncodedInput = netInData[2];
+                int inputBit = 1; 
+                InputState& frameInputState = _inputs[netFrame];
+
+                _inputArrivedMutex->lock();
+                for(const String& action : CustomInput::_customActions)
+                {           
+                    float decodedValue = 0.0f;
+                    if(netEncodedInput & inputBit)
+                    {
+                        decodedValue = 1.0f;
+                    }
+
+                    //needs mutex (probably)
+                    frameInputState.netInputs.actions.insert(action, decodedValue);
+                    inputBit *= 2;
+                }
+                _inputArrivedPerFrame[netFrame] = true;
+                _inputArrivedMutex->unlock();
+
+                _inputReceivedMutex->lock();
+                _inputReceived = true;
+                if(_connectionState == NET_STATE::WAITING)
+                {
+                    _connectionState = NET_STATE::CONNECTED;
+                }
+                _inputReceivedMutex->unlock();
+                
+                break;
+            }
+            case NET_PACKET_TYPE::INPUT_REQUESTED:
+                break;
+            case NET_PACKET_TYPE::HANDSHAKE:
+                break;
+            case NET_PACKET_TYPE::GAME_END:
+                break;
+        }
+        
+
+               
+    
     }
 }
 
@@ -77,6 +131,7 @@ void godot::RollbackManager::_ready()
     for(int i = 0; i < 256; ++i)
     {
         _inputs.push_back(InputState{});
+        _inputArrivedPerFrame[i] = false;
     }
 
     //Init frame states
@@ -96,37 +151,25 @@ void godot::RollbackManager::_ready()
     _netThread->start(Callable(this, "netInputThreadFunc"));    
 }
 
-void RollbackManager::_unhandled_input(const Ref<InputEvent> &event)
+void godot::RollbackManager::getCurrentInput()
 {
+    //Get current input state
     int inputBit = 1;
+    const auto inputSingleton = Input::get_singleton();
     for(const String& action : CustomInput::_customActions)
     {
-        if(!event->is_action(action))
-        {
-            continue;
-        }        
-        _currentInputState.localInputs.actions.push_back(action);
-        double value = event->get_action_strength(action);
-        _currentInputState.localInputs.values.push_back(value);
-        
-        if(Math::floor(value) != 0.0)
-        {
-            _currentInputState.localInputs.encodedValue += inputBit;
-        }
-        
+        float value = Math::floor(inputSingleton->get_action_strength(action));
+        _currentInputState.localInputs.actions.insert(action, value);
+        _currentInputState.localInputs.encodedValue += (inputBit) * value;
         inputBit *= 2;
     }
-
-    if(event->is_action_pressed("test"))
-    {
-        doreset = true;
-    }
-
 }
 
 void godot::RollbackManager::_physics_process(double delta)
 {
     //Process Inputs
+    getCurrentInput();
+
     InputState& futureInputState = _inputs[(_frameNumber + _processInputDelay) % 256];
     futureInputState.copy(_currentInputState);
     _currentInputState.reset();
@@ -156,21 +199,14 @@ void godot::RollbackManager::_physics_process(double delta)
     //Store current frame state
     _savedFrames.emplace(FrameState(_inputs[_frameNumber], _currentGameState, _frameNumber));
 
+    sendInputPacket(futureInputState);
+
     //Remove oldest frame state
     _savedFrames.pop();
 
-    PackedByteArray netData{};
-    netData.append(_frameNumber);
-    netData.append(futureInputState.localInputs.encodedValue);
-
-    Error packetError = _socketUdp->put_packet(netData);
-    if(packetError != Error::OK)
-    {
-        UtilityFunctions::print("[Error] UDP.put_packet failed ErrorType: ", packetError);
-    }
-
     //Progress frame number
     _frameNumber >= 255 ? _frameNumber = 0 : ++_frameNumber;
+    _newInputsInCurrentFrame = false;
 }
 
 void godot::RollbackManager::_exit_tree()
@@ -180,16 +216,11 @@ void godot::RollbackManager::_exit_tree()
 }
 
 void godot::RollbackManager::onHandleInput(const InputState& inputs)
-{
-    if(inputs.localInputs.actions.size() != inputs.localInputs.values.size())
+{        
+    for(const auto& [action, value] : inputs.localInputs.actions)
     {
-        return;
-    }
-
-    for(int i = 0; i < inputs.localInputs.actions.size(); ++i)
-    {
-        emit_signal("onHandleInput", inputs.localInputs.actions[i], inputs.localInputs.values[i]);
-    }    
+        emit_signal("onHandleInput", action, value);
+    }  
 }
 
 void godot::RollbackManager::addToGameState(const String &name, const PackedByteArray& data)
@@ -246,4 +277,18 @@ Error godot::RollbackManager::initializeUDPSocket()
    }
 
     return ret;
+}
+
+void godot::RollbackManager::sendInputPacket(const InputState& inputToSend)
+{
+    PackedByteArray netData{};
+    netData.append((unsigned char)NET_PACKET_TYPE::INPUT);
+    netData.append(_frameNumber);
+    netData.append(inputToSend.localInputs.encodedValue);    
+
+    Error packetError = _socketUdp->put_packet(netData);
+    if(packetError != Error::OK)
+    {
+        UtilityFunctions::print("[Error] UDP.put_packet failed ErrorType: ", packetError);
+    }
 }

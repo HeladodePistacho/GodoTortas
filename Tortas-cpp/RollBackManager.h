@@ -30,7 +30,15 @@ namespace godot
     {
         WAITING = 0,    //Waiting to connect to peer
         END,            //Conection finished
-        CONNECTED       //Connected to another pier
+        CONNECTED       //Connected to another peer
+    };
+
+    enum class NET_PACKET_TYPE : unsigned char
+    {
+        INPUT = 0,
+        INPUT_REQUESTED,
+        HANDSHAKE,
+        GAME_END
     };
 
     class RollbackManager : public Node 
@@ -44,12 +52,14 @@ namespace godot
         int _frameNumber = 0;
 
         //Inputs will cycle between 0-256
+        void getCurrentInput();
         LocalVector<InputState> _inputs;
 
         //Queue with saved frames
         std::queue<FrameState> _savedFrames;
 
         InputState _currentInputState;
+
         GameState _currentGameState;
 
         bool doreset = false;
@@ -76,6 +86,10 @@ namespace godot
         int _packetSentAmount = 3;
 
         void netInputThreadFunc();
+        void sendInputPacket(const InputState& inputToSend);
+        bool _newInputsInCurrentFrame = false;
+
+
     protected:
 	    static void _bind_methods();
 
@@ -84,7 +98,6 @@ namespace godot
 	    ~RollbackManager();
 
         void _ready() override;
-        void _unhandled_input(const Ref<InputEvent>& event) override;
         void _physics_process(double delta) override;
         void _exit_tree() override;
 

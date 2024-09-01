@@ -3,20 +3,19 @@
 
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
+#include <godot_cpp/templates/hash_map.hpp>
 #include <godot_cpp/variant/string.hpp>
 
 namespace godot {
 
     struct InputElement
     {
-        TypedArray<String> actions;
-        TypedArray<float> values;
+        HashMap<String, float> actions;
         unsigned char encodedValue = 0;
 
         void reset() 
         {
             actions.clear();
-            values.clear();
             encodedValue = 0;
         }
     };
@@ -42,6 +41,7 @@ namespace godot {
 
         void copy(const InputState& other);
         void reset();
+        void print();
     };
 };
 

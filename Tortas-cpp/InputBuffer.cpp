@@ -86,4 +86,5 @@ void godot::CustomInput::init()
 {
     _customActions.insert("LLHorizontal");
     _customActions.insert("LRHorizontal");
+    _customActions.insert("Hit");
 }
