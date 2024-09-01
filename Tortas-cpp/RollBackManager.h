@@ -81,7 +81,8 @@ namespace godot
         Ref<Mutex> _inputReceivedMutex; //encloses input_received and also the game variable that tracks current game status
         
         //frame range of past inputs to send every frame
-        int _frameSendRrange = 5;
+        int _frameSendRange = 5;
+        
         //amount of input packets to send per frame
         int _packetSentAmount = 3;
 

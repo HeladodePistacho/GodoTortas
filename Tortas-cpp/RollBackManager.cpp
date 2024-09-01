@@ -35,10 +35,15 @@ void godot::RollbackManager::netInputThreadFunc()
                     //We already have input for this frame
                 //    break;
                 //}
-
+                UtilityFunctions::print("Data received: ");
+                for(int i = 0; i < netInData.size(); ++i)
+                {
+                    UtilityFunctions::print(netInData[i]);
+                }
+                
 
                 int netEncodedInput = netInData[2];
-                int inputBit = 1; 
+                unsigned char inputBit = 1; 
                 InputState& frameInputState = _inputs[netFrame];
 
                 _inputArrivedMutex->lock();
@@ -64,7 +69,7 @@ void godot::RollbackManager::netInputThreadFunc()
                     _connectionState = NET_STATE::CONNECTED;
                 }
                 _inputReceivedMutex->unlock();
-                
+
                 break;
             }
             case NET_PACKET_TYPE::INPUT_REQUESTED:
@@ -154,7 +159,7 @@ void godot::RollbackManager::_ready()
 void godot::RollbackManager::getCurrentInput()
 {
     //Get current input state
-    int inputBit = 1;
+    unsigned char inputBit = 1;
     const auto inputSingleton = Input::get_singleton();
     for(const String& action : CustomInput::_customActions)
     {
@@ -283,9 +288,20 @@ void godot::RollbackManager::sendInputPacket(const InputState& inputToSend)
 {
     PackedByteArray netData{};
     netData.append((unsigned char)NET_PACKET_TYPE::INPUT);
-    netData.append(_frameNumber);
-    netData.append(inputToSend.localInputs.encodedValue);    
 
+    int frameToSend = ((_frameNumber + _processInputDelay) % 256);
+
+    //Add the current frame and previous frames to help with UDP missing packets
+    for(int i = 0; i < _frameSendRange; --frameToSend, ++i)
+    {
+        if(frameToSend < 0)
+        {
+            frameToSend = 255;
+        }        
+        netData.append((unsigned char)frameToSend);
+        netData.append(_inputs[frameToSend].localInputs.encodedValue);
+    }
+        
     Error packetError = _socketUdp->put_packet(netData);
     if(packetError != Error::OK)
     {
