@@ -28,6 +28,9 @@ InputState& InputState::operator=(InputState&& other) noexcept
     if (this != &other) 
     {
         localInputs.actions = std::move(other.localInputs.actions);
+        netInputs.actions = std::move(other.netInputs.actions);
+        localInputs.encodedValue  = other.localInputs.encodedValue;
+        netInputs.encodedValue  = other.netInputs.encodedValue;
     }
     return *this;
 }
@@ -41,13 +44,21 @@ void godot::InputState::copy(const InputState &other)
         localInputs.actions.insert(action, value);
     }
 
+    for(const auto& [action, value] : other.netInputs.actions)
+    {
+        netInputs.actions.insert(action, value);
+    }
+
     localInputs.encodedValue  = other.localInputs.encodedValue;
+    netInputs.encodedValue  = other.netInputs.encodedValue;
 }
 
 void godot::InputState::reset()
 {    
     localInputs.reset();
     netInputs.reset();
+    localInputs.encodedValue = 0;
+    netInputs.encodedValue = 0;
 }
 
 void godot::InputState::print()
