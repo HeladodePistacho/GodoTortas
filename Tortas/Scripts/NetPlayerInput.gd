@@ -36,18 +36,9 @@ func _on_rollback_manager_on_frame_update(delta):
 		currentSpeed = 0;
 
 	position.x += (currentSpeed * delta);
-	pass # Replace with function body.
-
-func _on_rollback_manager_on_handle_input(action, value):	
-	#This code asumes this 2 actions are exclusive one is positive when the other one is 0
-	if(action == "LLHorizontal"):
-		speedStrength = -walkSpeedStrenght if(value != 0.0) else 0.0
-			
-	if(action == "LRHorizontal"):
-		if(value != 0):
-			speedStrength = walkSpeedStrenght
 	
-	pass
+	frame += 1;
+	pass # Replace with function body.
 
 func _on_rollback_manager_on_save_game_state():
 
@@ -69,4 +60,16 @@ func _on_rollback_manager_on_reset_state(element, gameState : PackedByteArray):
 	#else:
 		#queue_free()
 	
+	pass # Replace with function body.
+
+
+func _on_rollback_manager_on_handle_net_input(action, value):
+	print("On handle net Input Action: ", action, " Value: ", value)
+	
+	if(action == "LLHorizontal"):
+		speedStrength = walkSpeedStrenght if(value != 0.0) else 0.0
+			
+	if(action == "LRHorizontal"):
+		if(value != 0):
+			speedStrength = -walkSpeedStrenght
 	pass # Replace with function body.

@@ -1,16 +1,23 @@
-[gd_scene load_steps=3 format=3 uid="uid://cienxkgkxhs41"]
+[gd_scene load_steps=6 format=3 uid="uid://cienxkgkxhs41"]
 
 [ext_resource type="Script" path="res://Scenes/Settings.gd" id="1_41j4q"]
 [ext_resource type="PackedScene" uid="uid://byck7ps2sbg07" path="res://Scenes/CharacterBase.tscn" id="1_ellkx"]
+[ext_resource type="Script" path="res://Scripts/NetPlayerInput.gd" id="3_q2q07"]
+[ext_resource type="Script" path="res://Scenes/DebugLabel.gd" id="4_o34qo"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_bn8hq"]
 
 [node name="TestScene" type="Node2D"]
 script = ExtResource("1_41j4q")
 
 [node name="RollbackManager" type="RollbackManager" parent="."]
+_ipToConnect = "192.168.18.68"
+_port = 8963
+_portToListen = 8843
 process_mode = 4
 
 [node name="Character" parent="." node_paths=PackedStringArray("rollbackManager") instance=ExtResource("1_ellkx")]
-position = Vector2(530, 351)
+position = Vector2(533, 546)
 rollbackManager = NodePath("../RollbackManager")
 walkSpeedStrenght = 2.0
 acceleration = 40
@@ -18,13 +25,29 @@ maxSpeed = 400
 dashSpeed = 1000
 
 [node name="Character2" parent="." node_paths=PackedStringArray("rollbackManager") instance=ExtResource("1_ellkx")]
-position = Vector2(308, 264)
+position = Vector2(534, 158)
+script = ExtResource("3_q2q07")
+rollbackManager = NodePath("../RollbackManager")
+walkSpeedStrenght = 2.0
+acceleration = 40
+maxSpeed = 400
+dashSpeed = 1000
+
+[node name="Label" type="Label" parent="." node_paths=PackedStringArray("rollbackManager")]
+offset_right = 136.0
+offset_bottom = 51.0
+text = "Test Text"
+label_settings = SubResource("LabelSettings_bn8hq")
+max_lines_visible = 50
+language = "en"
+script = ExtResource("4_o34qo")
 rollbackManager = NodePath("../RollbackManager")
 
 [connection signal="onFrameUpdate" from="RollbackManager" to="Character" method="_on_rollback_manager_on_frame_update"]
 [connection signal="onFrameUpdate" from="RollbackManager" to="Character2" method="_on_rollback_manager_on_frame_update"]
+[connection signal="onFrameUpdate" from="RollbackManager" to="Label" method="_on_rollback_manager_on_frame_update"]
 [connection signal="onHandleInput" from="RollbackManager" to="Character" method="_on_rollback_manager_on_handle_input"]
-[connection signal="onHandleInput" from="RollbackManager" to="Character2" method="_on_rollback_manager_on_handle_input"]
+[connection signal="onHandleNetInput" from="RollbackManager" to="Character2" method="_on_rollback_manager_on_handle_net_input"]
 [connection signal="onResetState" from="RollbackManager" to="Character" method="_on_rollback_manager_on_reset_state"]
 [connection signal="onResetState" from="RollbackManager" to="Character2" method="_on_rollback_manager_on_reset_state"]
 [connection signal="onSaveGameState" from="RollbackManager" to="Character" method="_on_rollback_manager_on_save_game_state"]

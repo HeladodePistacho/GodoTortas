@@ -86,13 +86,24 @@ namespace godot
         //amount of input packets to send per frame
         int _packetSentAmount = 3;
 
+        String _ipToConnect;
+        int _port = 0;
+        int _portToListen = 0;
+
+        Ref<Mutex> _testMutex;
+        int testDropPackets = 0;
+
         void netInputThreadFunc();
+        void sendNetData(const PackedByteArray& netData);
         void sendInputPacket(const InputState& inputToSend);
         void sendInputPacket(int frameNeededStart);
+        void sendRequestInputPacket(int frameNeeded);
+        void sendHandshakePacket(bool isReply);
         void processInputPacket(const PackedByteArray& netData);
         void processRequestPacket(const PackedByteArray& netData);
-        bool _newInputsInCurrentFrame = false;
+        void processHandshakePacket(const PackedByteArray& netData);
 
+        void updateGameState(float delta);
 
     protected:
 	    static void _bind_methods();
@@ -133,8 +144,41 @@ namespace godot
             return _numRollbackFrames;
         }
 
+        void setIp(const String& ipToConnect)
+        {
+            _ipToConnect = ipToConnect;
+        }
+
+        const String& getIp() const
+        {
+            return _ipToConnect;
+        }
+
+        void setPort(const int port)
+        {
+            _port = port;
+        }
+
+        int getPort() const        
+        {
+            return _port;
+        }
+
+        void setPortToListen(const int port)
+        {
+            _portToListen = port;
+        }
+
+        int getPortToListen() const        
+        {
+            return _portToListen;
+        }
+
         //Net
         Error initializeUDPSocket();
+
+        //Test
+        void printConnectionState();
     };
 }
 
