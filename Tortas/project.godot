@@ -15,6 +15,11 @@ run/main_scene="res://Scenes/test_scene.tscn"
 config/features=PackedStringArray("4.2", "Forward Plus")
 config/icon="res://icon.svg"
 
+[display]
+
+window/size/viewport_width=1200
+window/size/viewport_height=1000
+
 [editor]
 
 run/main_run_args="--verbose"
@@ -45,6 +50,10 @@ Hit={
 "events": [Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"button_index":0,"pressure":0.0,"pressed":false,"script":null)
 ]
 }
+
+[physics]
+
+common/physics_ticks_per_second=30
 
 [rendering]
 

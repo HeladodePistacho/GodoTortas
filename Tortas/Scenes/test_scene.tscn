@@ -1,9 +1,12 @@
-[gd_scene load_steps=6 format=3 uid="uid://cienxkgkxhs41"]
+[gd_scene load_steps=9 format=3 uid="uid://cienxkgkxhs41"]
 
 [ext_resource type="Script" path="res://Scenes/Settings.gd" id="1_41j4q"]
 [ext_resource type="PackedScene" uid="uid://byck7ps2sbg07" path="res://Scenes/CharacterBase.tscn" id="1_ellkx"]
 [ext_resource type="Script" path="res://Scripts/NetPlayerInput.gd" id="3_q2q07"]
 [ext_resource type="Script" path="res://Scenes/DebugLabel.gd" id="4_o34qo"]
+[ext_resource type="PackedScene" uid="uid://qyjmnmjx6hej" path="res://Scenes/frameData.tscn" id="6_qwoad"]
+[ext_resource type="LabelSettings" uid="uid://dicaqqh3et5jn" path="res://DebugUI/defaultSettingLbl.res" id="7_obite"]
+[ext_resource type="LabelSettings" uid="uid://ckftfi4vm6304" path="res://DebugUI/greenLabelSettings.res" id="7_xk1s0"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_bn8hq"]
 
@@ -12,13 +15,13 @@ script = ExtResource("1_41j4q")
 
 [node name="RollbackManager" type="RollbackManager" parent="."]
 _axisSensitivity = 0.2
-_ipToConnect = "127.0.0.1"
+_ipToConnect = "192.168.18.43"
 _port = 8843
-_portToListen = 8843
+_portToListen = 8844
 process_mode = 4
 
 [node name="Character" parent="." node_paths=PackedStringArray("rollbackManager") instance=ExtResource("1_ellkx")]
-position = Vector2(533, 546)
+position = Vector2(533, 233)
 rollbackManager = NodePath("../RollbackManager")
 walkSpeedStrenght = 2.0
 acceleration = 40
@@ -26,7 +29,7 @@ maxSpeed = 400
 dashSpeed = 1000
 
 [node name="Character2" parent="." node_paths=PackedStringArray("rollbackManager") instance=ExtResource("1_ellkx")]
-position = Vector2(534, 158)
+position = Vector2(533, 158)
 script = ExtResource("3_q2q07")
 rollbackManager = NodePath("../RollbackManager")
 walkSpeedStrenght = 2.0
@@ -34,7 +37,9 @@ acceleration = 40
 maxSpeed = 400
 dashSpeed = 1000
 
-[node name="Label" type="Label" parent="." node_paths=PackedStringArray("rollbackManager")]
+[node name="DebugUI" type="Node" parent="."]
+
+[node name="Label" type="Label" parent="DebugUI" node_paths=PackedStringArray("rollbackManager")]
 offset_right = 136.0
 offset_bottom = 51.0
 text = "Test Text"
@@ -42,13 +47,22 @@ label_settings = SubResource("LabelSettings_bn8hq")
 max_lines_visible = 50
 language = "en"
 script = ExtResource("4_o34qo")
-rollbackManager = NodePath("../RollbackManager")
+rollbackManager = NodePath("../../RollbackManager")
+
+[node name="Control" parent="DebugUI" node_paths=PackedStringArray("rollbackManager") instance=ExtResource("6_qwoad")]
+offset_left = 656.0
+offset_top = 2.0
+offset_right = -2.0
+offset_bottom = 2.0
+rollbackManager = NodePath("../../RollbackManager")
+defaultLabelSettings = ExtResource("7_obite")
+greenLabelSettings = ExtResource("7_xk1s0")
 
 [connection signal="onFrameStart" from="RollbackManager" to="Character" method="_on_rollback_manager_on_frame_start"]
 [connection signal="onFrameStart" from="RollbackManager" to="Character2" method="_on_rollback_manager_on_frame_start"]
 [connection signal="onFrameUpdate" from="RollbackManager" to="Character" method="_on_rollback_manager_on_frame_update"]
 [connection signal="onFrameUpdate" from="RollbackManager" to="Character2" method="_on_rollback_manager_on_frame_update"]
-[connection signal="onFrameUpdate" from="RollbackManager" to="Label" method="_on_rollback_manager_on_frame_update"]
+[connection signal="onFrameUpdate" from="RollbackManager" to="DebugUI/Label" method="_on_rollback_manager_on_frame_update"]
 [connection signal="onHandleInput" from="RollbackManager" to="Character" method="_on_rollback_manager_on_handle_input"]
 [connection signal="onHandleNetInput" from="RollbackManager" to="Character2" method="_on_rollback_manager_on_handle_net_input"]
 [connection signal="onResetState" from="RollbackManager" to="Character" method="_on_rollback_manager_on_reset_state"]

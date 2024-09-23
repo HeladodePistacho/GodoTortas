@@ -19,6 +19,7 @@
 #include <queue>
 #include <godot_cpp/classes/thread.hpp>
 #include <godot_cpp/classes/mutex.hpp>
+#include <godot_cpp/classes/random_number_generator.hpp>
 
 #include "InputState.h"
 #include "GameState.h"
@@ -90,9 +91,8 @@ namespace godot
         String _ipToConnect;
         int _port = 0;
         int _portToListen = 0;
-
-        Ref<Mutex> _testMutex;
-        int testDropPackets = 0;
+        int _packetLossPercentage = 0;
+        Ref<RandomNumberGenerator> _randomGenerator;
 
         void netInputThreadFunc();
         void sendNetData(const PackedByteArray& netData);
@@ -178,6 +178,32 @@ namespace godot
         {
             return _axisSensitivity;
         }       
+
+        void setPacketLossPercentage(int packetloss)
+        {
+            _packetLossPercentage = packetloss;
+        }
+        int getPacketLossPercentage() const 
+        {
+            return _packetLossPercentage;
+        }   
+
+        int getCurrentFrame() const 
+        {
+            return _frameNumber;
+        }    
+        bool getInputArrivedForFrame(int frame) const 
+        {
+            return _inputArrivedPerFrame[frame];
+        }
+        int getLocalInputForFrame(int frame) const 
+        {
+            return _inputs[frame].localInputs.encodedValue;
+        }
+        int getNetInputForFrame(int frame) const 
+        {
+            return _inputs[frame].netInputs.encodedValue;
+        }
 
         //Net
         Error initializeUDPSocket();

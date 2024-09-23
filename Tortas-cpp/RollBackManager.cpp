@@ -6,6 +6,7 @@
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/classes/input.hpp>
 
+
 using namespace godot;
 
 //namespace RollTest
@@ -23,6 +24,10 @@ void RollbackManager::_bind_methods()
 	ClassDB::bind_method(D_METHOD("setRollFrames", "rollFrames"), &RollbackManager::setRollFrames);
     ClassDB::bind_method(D_METHOD("getAxisSensitivity"), &RollbackManager::getAxisSensitivity);
 	ClassDB::bind_method(D_METHOD("setAxisSensitivity", "axisSens"), &RollbackManager::setAxisSensitivity);   
+    ClassDB::bind_method(D_METHOD("getCurrentFrame"), &RollbackManager::getCurrentFrame);
+    ClassDB::bind_method(D_METHOD("getInputArrivedForFrame", "frame"), &RollbackManager::getInputArrivedForFrame);
+    ClassDB::bind_method(D_METHOD("getLocalInputForFrame", "frame"), &RollbackManager::getLocalInputForFrame);
+    ClassDB::bind_method(D_METHOD("getNetInputForFrame", "frame"), &RollbackManager::getNetInputForFrame);
 
     ClassDB::bind_method(D_METHOD("getIp"), &RollbackManager::getIp);
 	ClassDB::bind_method(D_METHOD("setIp", "ipToConnect"), &RollbackManager::setIp);
@@ -30,6 +35,8 @@ void RollbackManager::_bind_methods()
 	ClassDB::bind_method(D_METHOD("setPort", "port"), &RollbackManager::setPort);
     ClassDB::bind_method(D_METHOD("getPortToListen"), &RollbackManager::getPortToListen);
 	ClassDB::bind_method(D_METHOD("setPortToListen", "port"), &RollbackManager::setPortToListen);
+    ClassDB::bind_method(D_METHOD("getPacketLossPercentage"), &RollbackManager::getPacketLossPercentage);
+	ClassDB::bind_method(D_METHOD("setPacketLossPercentage", "packetloss"), &RollbackManager::setPacketLossPercentage);
 
     ClassDB::bind_method(D_METHOD("netInputThreadFunc"), &RollbackManager::netInputThreadFunc);
     ClassDB::add_property("RollbackManager", PropertyInfo(Variant::INT, "_processInputDelay", PROPERTY_HINT_RANGE, "0,120"), "setDelay", "getDelay");
@@ -39,6 +46,7 @@ void RollbackManager::_bind_methods()
     ClassDB::add_property("RollbackManager", PropertyInfo(Variant::STRING, "_ipToConnect", PROPERTY_HINT_NONE, "Ip"), "setIp", "getIp");
     ClassDB::add_property("RollbackManager", PropertyInfo(Variant::INT, "_port", PROPERTY_HINT_RANGE, "1,15000"), "setPort", "getPort");
     ClassDB::add_property("RollbackManager", PropertyInfo(Variant::INT, "_portToListen", PROPERTY_HINT_RANGE, "1,15000"), "setPortToListen", "getPortToListen");
+    ClassDB::add_property("RollbackManager", PropertyInfo(Variant::INT, "_packetLossPercentage", PROPERTY_HINT_RANGE, "0,100"), "setPacketLossPercentage", "getPacketLossPercentage");
 
     //Methods
     ClassDB::bind_method(D_METHOD("addToGameState", "name", "data"), &RollbackManager::addToGameState);
@@ -102,11 +110,13 @@ void godot::RollbackManager::_ready()
     _inputArrayMutex.instantiate();
     _inputRequestMutex.instantiate();
     _inputReceivedMutex.instantiate();
-    _testMutex.instantiate();
     _netThread.instantiate();
 
     initializeUDPSocket();    
-    _netThread->start(Callable(this, "netInputThreadFunc"));    
+    _netThread->start(Callable(this, "netInputThreadFunc")); 
+
+    _randomGenerator.instantiate(); 
+    _randomGenerator->set_seed(1234567);  
 }
 
 void godot::RollbackManager::getCurrentInput()
@@ -298,6 +308,12 @@ void godot::RollbackManager::netInputThreadFunc()
 
 void godot::RollbackManager::sendNetData(const PackedByteArray &netData)
 {
+    int randomValue = _randomGenerator->randi_range(0, 99);
+    if(randomValue < _packetLossPercentage)
+    {
+        return;
+    }
+
     //Send the packet multiple times to help with UDP unreliavility
     for(int i = 0; i < _packetSentAmount; ++i)
     {
@@ -381,7 +397,8 @@ void godot::RollbackManager::processInputPacket(const PackedByteArray &netData)
         }
 
         unsigned char inputBit = 1; 
-        InputState& frameInputState = _inputs[netFrame];                    
+        InputState& frameInputState = _inputs[netFrame];  
+        frameInputState.netInputs.encodedValue = netEncodedInput;                 
         for(const String& action : CustomInput::_customActions)
         {           
             float decodedValue = 0.0f;
