@@ -21,21 +21,24 @@ void RollbackManager::_bind_methods()
 	ClassDB::bind_method(D_METHOD("setDelay", "delay"), &RollbackManager::setDelay);
     ClassDB::bind_method(D_METHOD("getRollFrames"), &RollbackManager::getRollFrames);
 	ClassDB::bind_method(D_METHOD("setRollFrames", "rollFrames"), &RollbackManager::setRollFrames);
+    ClassDB::bind_method(D_METHOD("getAxisSensitivity"), &RollbackManager::getAxisSensitivity);
+	ClassDB::bind_method(D_METHOD("setAxisSensitivity", "axisSens"), &RollbackManager::setAxisSensitivity);   
 
     ClassDB::bind_method(D_METHOD("getIp"), &RollbackManager::getIp);
-	ClassDB::bind_method(D_METHOD("setIp", "Ip"), &RollbackManager::setIp);
+	ClassDB::bind_method(D_METHOD("setIp", "ipToConnect"), &RollbackManager::setIp);
     ClassDB::bind_method(D_METHOD("getPort"), &RollbackManager::getPort);
-	ClassDB::bind_method(D_METHOD("setPort", "Port"), &RollbackManager::setPort);
+	ClassDB::bind_method(D_METHOD("setPort", "port"), &RollbackManager::setPort);
     ClassDB::bind_method(D_METHOD("getPortToListen"), &RollbackManager::getPortToListen);
-	ClassDB::bind_method(D_METHOD("setPortToListen", "Port"), &RollbackManager::setPortToListen);
+	ClassDB::bind_method(D_METHOD("setPortToListen", "port"), &RollbackManager::setPortToListen);
 
     ClassDB::bind_method(D_METHOD("netInputThreadFunc"), &RollbackManager::netInputThreadFunc);
     ClassDB::add_property("RollbackManager", PropertyInfo(Variant::INT, "_processInputDelay", PROPERTY_HINT_RANGE, "0,120"), "setDelay", "getDelay");
     ClassDB::add_property("RollbackManager", PropertyInfo(Variant::INT, "_numRollbackFrames", PROPERTY_HINT_RANGE, "1,120"), "setRollFrames", "getRollFrames");
+    ClassDB::add_property("RollbackManager", PropertyInfo(Variant::FLOAT, "_axisSensitivity", PROPERTY_HINT_RANGE, "0.0,1.0,0.05"), "setAxisSensitivity", "getAxisSensitivity");
+
     ClassDB::add_property("RollbackManager", PropertyInfo(Variant::STRING, "_ipToConnect", PROPERTY_HINT_NONE, "Ip"), "setIp", "getIp");
     ClassDB::add_property("RollbackManager", PropertyInfo(Variant::INT, "_port", PROPERTY_HINT_RANGE, "1,15000"), "setPort", "getPort");
     ClassDB::add_property("RollbackManager", PropertyInfo(Variant::INT, "_portToListen", PROPERTY_HINT_RANGE, "1,15000"), "setPortToListen", "getPortToListen");
-    
 
     //Methods
     ClassDB::bind_method(D_METHOD("addToGameState", "name", "data"), &RollbackManager::addToGameState);
@@ -112,8 +115,8 @@ void godot::RollbackManager::getCurrentInput()
     unsigned char inputBit = 1;
     const auto inputSingleton = Input::get_singleton();
     for(const String& action : CustomInput::_customActions)
-    {
-        float value = Math::floor(inputSingleton->get_action_strength(action));
+    {                
+        float value = inputSingleton->get_action_strength(action) >= _axisSensitivity ? 1 : 0;
         _currentInputState.localInputs.actions.insert(action, value);
         _currentInputState.localInputs.encodedValue += (inputBit) * value;
         inputBit *= 2;
@@ -324,31 +327,15 @@ void godot::RollbackManager::sendInputPacket(const InputState& inputToSend)
         netData.append(_inputs[frameToSend].localInputs.encodedValue);
     }
     
-    /*_testMutex->lock();
-    if(testDropPackets % 100 == 0)
-    {
-        sendNetData(netData); 
-    }
-    ++testDropPackets;
-    _testMutex->unlock();*/
     sendNetData(netData);   
 }
 
 void godot::RollbackManager::sendInputPacket(int frameNeeded)
-{
-   //UtilityFunctions::print("Send inpur");
+{   
     PackedByteArray netData{};
     netData.append((unsigned char)NET_PACKET_TYPE::INPUT);
     netData.append((unsigned char)frameNeeded);
     netData.append(_inputs[frameNeeded].localInputs.encodedValue);
-
-    /*_testMutex->lock();
-    if(testDropPackets % 100 == 0)
-    {
-        sendNetData(netData); 
-    }
-    ++testDropPackets;
-    _testMutex->unlock();*/
 
     sendNetData(netData);
 }
@@ -436,8 +423,7 @@ void godot::RollbackManager::processRequestPacket(const PackedByteArray &netData
             //future frames should be empty (if not ¯\_(ツ)_/¯)
             UtilityFunctions::print("We break because if we don't have input for that frame: ", frame);
             break;
-        }
-        //UtilityFunctions::print("Sending input for frame: ", frame);
+        }        
         sendInputPacket(frame);        
     }
     _inputArrayMutex->unlock();
@@ -472,6 +458,7 @@ void godot::RollbackManager::updateGameState(float delta)
     _inputArrayMutex->lock();
     InputState& futureInputState = _inputs[(_frameNumber + _processInputDelay) % 256];
     futureInputState.copy(_currentInputState);
+    //futureInputState.print();
     _currentInputState.reset();
 
     sendInputPacket(futureInputState);
@@ -500,6 +487,11 @@ void godot::RollbackManager::updateGameState(float delta)
     //Frame start
     emit_signal("onFrameStart");
 
+    const auto inputSingleton = Input::get_singleton();
+    if(inputSingleton->get_action_strength("test"))
+    {
+        //onResetGameState();
+    }
     /*if(doreset)
     {
         onResetGameState();

@@ -11,8 +11,9 @@
 script = ExtResource("1_41j4q")
 
 [node name="RollbackManager" type="RollbackManager" parent="."]
-_ipToConnect = "192.168.18.68"
-_port = 8963
+_axisSensitivity = 0.2
+_ipToConnect = "127.0.0.1"
+_port = 8843
 _portToListen = 8843
 process_mode = 4
 
@@ -43,6 +44,8 @@ language = "en"
 script = ExtResource("4_o34qo")
 rollbackManager = NodePath("../RollbackManager")
 
+[connection signal="onFrameStart" from="RollbackManager" to="Character" method="_on_rollback_manager_on_frame_start"]
+[connection signal="onFrameStart" from="RollbackManager" to="Character2" method="_on_rollback_manager_on_frame_start"]
 [connection signal="onFrameUpdate" from="RollbackManager" to="Character" method="_on_rollback_manager_on_frame_update"]
 [connection signal="onFrameUpdate" from="RollbackManager" to="Character2" method="_on_rollback_manager_on_frame_update"]
 [connection signal="onFrameUpdate" from="RollbackManager" to="Label" method="_on_rollback_manager_on_frame_update"]

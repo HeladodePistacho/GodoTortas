@@ -3,5 +3,5 @@ extends Node2D
 
 # Called when the node enters the scene tree for the first time.
 func _ready():
-	Engine.max_fps = 144;
+	#Engine.max_fps = 144;
 	pass # Replace with function body.

@@ -13,7 +13,7 @@ InputState::~InputState()
 
 }
 
-InputState::InputState(const InputState &other) : localInputs(other.localInputs)
+InputState::InputState(const InputState &other) : localInputs(other.localInputs), netInputs(other.netInputs)
 {
 
 }

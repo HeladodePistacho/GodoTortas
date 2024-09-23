@@ -47,6 +47,7 @@ namespace godot
 
         int _processInputDelay = 5;
         int _numRollbackFrames = 10;
+        float _axisSensitivity = 0.0f;
 
         //Between 0 and 255
         int _frameNumber = 0;
@@ -128,17 +129,15 @@ namespace godot
         {
             _processInputDelay = delay;
         }
-
         int getDelay() const
         {
             return _processInputDelay;
         }
 
-        void setRollFrames(const int rollFrames)
+        void setRollFrames(int rollFrames)
         {
             _numRollbackFrames = rollFrames;
         }
-
         int getRollFrames() const
         {
             return _numRollbackFrames;
@@ -148,31 +147,37 @@ namespace godot
         {
             _ipToConnect = ipToConnect;
         }
-
         const String& getIp() const
         {
             return _ipToConnect;
         }
 
-        void setPort(const int port)
+        void setPort(int port)
         {
             _port = port;
         }
-
         int getPort() const        
         {
             return _port;
         }
 
-        void setPortToListen(const int port)
+        void setPortToListen(int port)
         {
             _portToListen = port;
         }
-
         int getPortToListen() const        
         {
             return _portToListen;
         }
+
+        void setAxisSensitivity(float axisSens)
+        {
+            _axisSensitivity = axisSens;
+        }
+        float getAxisSensitivity() const 
+        {
+            return _axisSensitivity;
+        }       
 
         //Net
         Error initializeUDPSocket();
