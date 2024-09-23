@@ -35,29 +35,27 @@ InputState& InputState::operator=(InputState&& other) noexcept
     return *this;
 }
 
-void godot::InputState::copy(const InputState &other)
+void godot::InputState::copyLocalInput(const InputState &other)
 {
-    reset();
+    resetLocalInput();
     
     for(const auto& [action, value] : other.localInputs.actions)
     {
         localInputs.actions.insert(action, value);
     }
 
-    for(const auto& [action, value] : other.netInputs.actions)
-    {
-        netInputs.actions.insert(action, value);
-    }
-
     localInputs.encodedValue  = other.localInputs.encodedValue;
-    netInputs.encodedValue  = other.netInputs.encodedValue;
 }
 
-void godot::InputState::reset()
+void godot::InputState::resetLocalInput()
 {    
     localInputs.reset();
-    netInputs.reset();
     localInputs.encodedValue = 0;
+}
+
+void godot::InputState::resetNetInput()
+{
+    netInputs.reset();
     netInputs.encodedValue = 0;
 }
 
@@ -69,4 +67,11 @@ void godot::InputState::print()
     }
 
     UtilityFunctions::print("Encoded value: ", localInputs.encodedValue);
+
+    for(const auto& [action, value] : netInputs.actions)
+    {
+        UtilityFunctions::print("Net action: ", action, "Net value: ", value);
+    }
+
+    UtilityFunctions::print("Net Encoded value: ", netInputs.encodedValue);
 }

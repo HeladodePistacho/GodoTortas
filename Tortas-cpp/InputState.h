@@ -39,8 +39,9 @@ namespace godot {
         // Move assignment operator
         InputState& operator=(InputState&& other) noexcept;
 
-        void copy(const InputState& other);
-        void reset();
+        void copyLocalInput(const InputState& other);
+        void resetLocalInput();
+        void resetNetInput();
         void print();
     };
 };

@@ -398,7 +398,8 @@ void godot::RollbackManager::processInputPacket(const PackedByteArray &netData)
         }
 
         unsigned char inputBit = 1; 
-        InputState& frameInputState = _inputs[netFrame];  
+        InputState& frameInputState = _inputs[netFrame]; 
+        frameInputState.resetNetInput(); 
         frameInputState.netInputs.encodedValue = netEncodedInput;                 
         for(const String& action : CustomInput::_customActions)
         {           
@@ -413,7 +414,10 @@ void godot::RollbackManager::processInputPacket(const PackedByteArray &netData)
         }
         _inputArrivedPerFrame[netFrame] = true;  
         newInput = true;
-        packetIndex += 2;                  
+        packetIndex += 2;
+
+        UtilityFunctions::print("Frame: ", netFrame);
+        frameInputState.print();               
     }            
     _inputArrayMutex->unlock();
 
@@ -478,9 +482,8 @@ void godot::RollbackManager::updateGameState(float delta)
 
     _inputArrayMutex->lock();
     InputState& futureInputState = _inputs[(_frameNumber + _processInputDelay) % 256];
-    futureInputState.copy(_currentInputState);
-    //futureInputState.print();
-    _currentInputState.reset();
+    futureInputState.copyLocalInput(_currentInputState);
+    _currentInputState.resetLocalInput();
 
     sendInputPacket(futureInputState);
 
