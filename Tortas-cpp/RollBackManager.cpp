@@ -384,6 +384,7 @@ void godot::RollbackManager::processInputPacket(const PackedByteArray &netData)
     //Packet Structure
     // NET_PACKET_TYPE::INPUT + Frame 0 + Frame 0 input + Frame 1 + Frame 1 input...            
     int packetIndex = 1;
+    bool newInput = false;
     _inputArrayMutex->lock();
     while(packetIndex < netData.size())
     {
@@ -411,18 +412,21 @@ void godot::RollbackManager::processInputPacket(const PackedByteArray &netData)
             inputBit *= 2;                        
         }
         _inputArrivedPerFrame[netFrame] = true;  
+        newInput = true;
         packetIndex += 2;                  
     }            
     _inputArrayMutex->unlock();
 
-
-    _inputReceivedMutex->lock();
-    _inputReceived = true;
-    if(_connectionState == NET_STATE::WAITING)
+    if(newInput)
     {
-        _connectionState = NET_STATE::PLAYING;
-    }
-    _inputReceivedMutex->unlock();
+        _inputReceivedMutex->lock();
+        _inputReceived = true;
+        if(_connectionState == NET_STATE::WAITING)
+        {
+            _connectionState = NET_STATE::PLAYING;
+        }
+        _inputReceivedMutex->unlock();
+    }    
 }
 
 void godot::RollbackManager::processRequestPacket(const PackedByteArray &netData)
