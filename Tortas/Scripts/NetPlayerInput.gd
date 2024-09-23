@@ -18,6 +18,10 @@ var test = 0;
 var positionSize : int = var_to_bytes(position).size()
 var speedSize : int = var_to_bytes(currentSpeed).size()
 var tessssdsdt = 0
+
+var walkLeft = 0;
+var walkRight = 0;
+
 # Called when the node enters the scene tree for the first time.
 func _ready():
 	currentSpeed = 0;
@@ -63,13 +67,24 @@ func _on_rollback_manager_on_reset_state(element, gameState : PackedByteArray):
 	pass # Replace with function body.
 
 
-func _on_rollback_manager_on_handle_net_input(action, value):
-	print("On handle net Input Action: ", action, " Value: ", value)
-	
-	if(action == "LLHorizontal"):
-		speedStrength = walkSpeedStrenght if(value != 0.0) else 0.0
+func _on_rollback_manager_on_handle_net_input(action, value):	
+	if(action == "LLHorizontal"):		
+		walkLeft = value;
+			#walkState = WalkState.LEFT
+			#speedStrength = -walkSpeedStrenght
 			
 	if(action == "LRHorizontal"):
-		if(value != 0):
-			speedStrength = -walkSpeedStrenght
+		walkRight = value;	
+	pass # Replace with function body.
+
+
+func _on_rollback_manager_on_frame_start():
+	if(walkLeft == 1 and walkRight == 0):
+		speedStrength = -walkSpeedStrenght
+	
+	if(walkLeft == 0 and walkRight == 1):
+		speedStrength = walkSpeedStrenght
+		
+	if(walkLeft == 0 and walkRight == 0):
+		speedStrength = 0
 	pass # Replace with function body.
