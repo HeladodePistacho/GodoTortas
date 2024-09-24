@@ -27,6 +27,24 @@
 
 namespace godot
 {
+    class LockGuard
+    {
+        public:
+        LockGuard(Ref<Mutex> mutex) : _mutex(mutex), _locked(true)
+        {
+            _mutex->lock();
+        }
+
+        ~LockGuard()
+        {
+            _mutex->unlock();
+        }
+
+        private:
+        Ref<Mutex> _mutex;
+        bool _locked = false;
+    };
+
     enum class NET_STATE : unsigned char
     {
         WAITING = 0,    //Waiting to connect to peer
@@ -55,6 +73,7 @@ namespace godot
 
         //Inputs will cycle between 0-256
         void getCurrentInput();
+        void ProcessCurrentInput();
         LocalVector<InputState> _inputs;
 
         //Queue with saved frames
@@ -93,6 +112,11 @@ namespace godot
         int _portToListen = 0;
         int _packetLossPercentage = 0;
         Ref<RandomNumberGenerator> _randomGenerator;
+
+        bool getInputReceivedTS(); //TS stands for thread safe
+        bool getInputArrivedPerFrameTS(int frame);
+        bool isConnectionEndedTS();
+        const InputState& getInputStateForFrameTS(int frame);
 
         void netInputThreadFunc();
         void sendNetData(const PackedByteArray& netData);

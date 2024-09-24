@@ -6,14 +6,7 @@
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/classes/input.hpp>
 
-
 using namespace godot;
-
-//namespace RollTest
-//{
-//    String addressToConect = "127.0.0.1";
-//    int port = 8843;
-//}
 
 void RollbackManager::_bind_methods()
 {
@@ -132,39 +125,64 @@ void godot::RollbackManager::getCurrentInput()
     }
 }
 
+void godot::RollbackManager::ProcessCurrentInput()
+{
+    //Get Input state
+    getCurrentInput();
+{
+    //Set Inpput for frame [_frameNumber + _processInputDelay]
+    LockGuard lock{_inputArrayMutex};
+    InputState& futureInputState = _inputs[(_frameNumber + _processInputDelay) % 256];
+    futureInputState.copyLocalInput(_currentInputState);
+    _currentInputState.resetLocalInput();
+    sendInputPacket(futureInputState);
+
+    //Reset input arrived array
+    _inputArrivedPerFrame[(_frameNumber + (_processInputDelay * 2) + 1) % 256] = false;  
+}
+{   
+    LockGuard lock{_inputRequestMutex};
+    //Set current frame input as available for request
+    _inputRequestAvailablePerFrame[(_frameNumber + _processInputDelay) % 256] = true;
+
+    //Set past frame input as not available for request
+    int frameToReset = _frameNumber - _processInputDelay;
+    if(frameToReset < 0)
+    {
+       frameToReset = 256 + frameToReset;
+    }
+    _inputRequestAvailablePerFrame[frameToReset] = false;
+}
+}
+
 void godot::RollbackManager::_physics_process(double delta)
 {
-    _inputReceivedMutex->lock();
-    if(_connectionState == NET_STATE::END)
+    if(isConnectionEndedTS())
     {
-        _inputReceivedMutex->unlock();
         sendEndGamePacket();
-        if(!_netThread.is_null())
+        if(!_netThread.is_null() && _netThread->is_alive())
         {    
             _netThread->wait_to_finish();
         }
     }
-
-    if(_inputReceived)
+    
+    if(getInputReceivedTS())
     {
-        _inputArrayMutex->lock();
-        if(_inputArrivedPerFrame[_frameNumber]) //If the input for the current frame has arrived we proceed
+        if(getInputArrivedPerFrameTS(_frameNumber)) //If the input for the current frame has arrived we proceed
         {
-            _inputArrayMutex->unlock();
-            _inputReceivedMutex->unlock();
             updateGameState(delta);
         }
         else
-        {
-             _inputArrayMutex->unlock();
-            _inputReceived = false;
-            _inputReceivedMutex->unlock();
+        {            
             sendRequestInputPacket(_frameNumber);
+
+            LockGuard lock{_inputReceivedMutex};
+            _inputReceived = false;
         }
     }
     else
     {
-        _inputReceivedMutex->unlock();
+        LockGuard lock{_inputReceivedMutex};
         if(_connectionState == NET_STATE::PLAYING)
         {
             sendRequestInputPacket(_frameNumber);
@@ -185,12 +203,14 @@ void godot::RollbackManager::_exit_tree()
     {        
         return;
     }
+    UtilityFunctions::print("Cleanup");
 
-    _inputReceivedMutex->lock();
+    {
+    LockGuard lock{_inputReceivedMutex};
     _connectionState = NET_STATE::END;
-    _inputReceivedMutex->unlock();
+    }
 
-    if(!_netThread.is_null())
+    if(!_netThread.is_null() && _netThread->is_alive())
     {    
         _netThread->wait_to_finish();
     }
@@ -293,16 +313,38 @@ void godot::RollbackManager::printConnectionState()
     }
 }
 
+bool godot::RollbackManager::getInputReceivedTS()
+{
+    LockGuard lock{_inputReceivedMutex};
+    return _inputReceived;
+}
+
+bool godot::RollbackManager::getInputArrivedPerFrameTS(int frame)
+{
+    LockGuard lock{_inputArrayMutex};
+    return _inputArrivedPerFrame[frame];
+}
+
+bool godot::RollbackManager::isConnectionEndedTS()
+{
+    LockGuard lock{_inputReceivedMutex};
+    return _connectionState == NET_STATE::END;
+}
+
+const InputState &godot::RollbackManager::getInputStateForFrameTS(int frame)
+{
+    LockGuard lock{_inputArrayMutex};
+    return _inputs[frame];
+}
+
 void godot::RollbackManager::netInputThreadFunc()
 {    
     while(true)
     {
-        _inputReceivedMutex->lock();
-        if(_connectionState == NET_STATE::END)
+        if(isConnectionEndedTS())
         {
             return;
-        }
-        _inputReceivedMutex->unlock();
+        }   
 
         PackedByteArray netInData = _socketUdp->get_packet();
         if(netInData.is_empty())
@@ -415,7 +457,8 @@ void godot::RollbackManager::processInputPacket(const PackedByteArray &netData)
     // NET_PACKET_TYPE::INPUT + Frame 0 + Frame 0 input + Frame 1 + Frame 1 input...            
     int packetIndex = 1;
     bool newInput = false;
-    _inputArrayMutex->lock();
+    {
+    LockGuard lock{_inputArrayMutex};
     while(packetIndex < netData.size())
     {
         int netEncodedInput = netData[packetIndex + 1];
@@ -446,17 +489,16 @@ void godot::RollbackManager::processInputPacket(const PackedByteArray &netData)
         _inputArrivedPerFrame[netFrame] = true;          
         packetIndex += 2;           
     }            
-    _inputArrayMutex->unlock();
+    }
 
     if(newInput)
     {
-        _inputReceivedMutex->lock();
+        LockGuard lock{_inputReceivedMutex};
         _inputReceived = true;
         if(_connectionState == NET_STATE::WAITING)
         {
             _connectionState = NET_STATE::PLAYING;
         }
-        _inputReceivedMutex->unlock();
     }    
 }
 
@@ -465,8 +507,8 @@ void godot::RollbackManager::processRequestPacket(const PackedByteArray &netData
     //Packet Structure
     // NET_PACKET_TYPE::REQUEST + Frame X + Frame Y
     // Requested frames from X to Y (Not inclusive)
-    _inputRequestMutex->lock();
-    _inputArrayMutex->lock();      
+    LockGuard inputRequestLock{_inputRequestMutex};
+    LockGuard inputArrivedLock{_inputArrayMutex};      
     for(int frame = netData[1]; frame != netData[2]; frame = (frame + 1) % 256)
     {          
         if(!_inputRequestAvailablePerFrame[frame])
@@ -478,22 +520,18 @@ void godot::RollbackManager::processRequestPacket(const PackedByteArray &netData
         }        
         sendInputPacket(frame);        
     }
-    _inputArrayMutex->unlock();
-    _inputRequestMutex->unlock();
-}
+} 
 
 void godot::RollbackManager::processHandshakePacket(const PackedByteArray &netData)
 {
-    _inputReceivedMutex->lock();
+    LockGuard lock{_inputReceivedMutex};
     if(_connectionState == NET_STATE::WAITING)
     {            
         _connectionState = NET_STATE::PLAYING;
         _inputReceived = true;
-        _inputReceivedMutex->unlock();
     }
     else
     {
-        _inputReceivedMutex->unlock();
         if(netData[1] == 0)
         {
             //Reply handshake packet
@@ -504,39 +542,14 @@ void godot::RollbackManager::processHandshakePacket(const PackedByteArray &netDa
 
 void godot::RollbackManager::processEndGamePacket()
 {
-    _inputReceivedMutex->lock();
+    LockGuard lock{_inputReceivedMutex};
     _connectionState = NET_STATE::END;
-    _inputReceivedMutex->unlock();
 }
 
 void godot::RollbackManager::updateGameState(float delta)
 {
     //Process Inputs
-    getCurrentInput();
-
-    _inputArrayMutex->lock();
-    InputState& futureInputState = _inputs[(_frameNumber + _processInputDelay) % 256];
-    futureInputState.copyLocalInput(_currentInputState);
-    _currentInputState.resetLocalInput();
-
-    sendInputPacket(futureInputState);
-
-    //Reset input arrived  
-    _inputArrivedPerFrame[(_frameNumber + (_processInputDelay * 2) + 1) % 256] = false;
-    _inputArrayMutex->unlock();    
-   
-    _inputRequestMutex->lock();
-    //Set current frame as available for request
-    _inputRequestAvailablePerFrame[(_frameNumber + _processInputDelay) % 256] = true;
-
-    int frameToReset = _frameNumber - _processInputDelay;
-    if(frameToReset < 0)
-    {
-       frameToReset = 256 + frameToReset;
-    }
-
-    _inputRequestAvailablePerFrame[frameToReset] = false;
-    _inputRequestMutex->unlock();
+    ProcessCurrentInput();
 
     //Create Game State
     _currentGameState.reset();
@@ -550,14 +563,11 @@ void godot::RollbackManager::updateGameState(float delta)
     {
         //onResetGameState();
     }
-    /*if(doreset)
-    {
-        onResetGameState();
-        doreset = false;
-    }*/
+
+    const InputState& currentFrameInputState = getInputStateForFrameTS(_frameNumber);
 
     //Handle frame Inputs
-    onHandleInput(_inputs[_frameNumber]);
+    onHandleInput(currentFrameInputState);
 
     //Frame Process
     emit_signal("onFrameUpdate", delta);
@@ -566,7 +576,7 @@ void godot::RollbackManager::updateGameState(float delta)
     emit_signal("onFrameEnd", delta);
 
     //Store current frame state
-    _savedFrames.emplace(FrameState(_inputs[_frameNumber], _currentGameState, _frameNumber));   
+    _savedFrames.emplace(FrameState(currentFrameInputState, _currentGameState, _frameNumber));   
 
     //Remove oldest frame state
     _savedFrames.pop();
