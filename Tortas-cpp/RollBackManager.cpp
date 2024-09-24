@@ -17,7 +17,7 @@ using namespace godot;
 
 void RollbackManager::_bind_methods()
 {
-    //Properties
+    //Methods for editor and scripts
     ClassDB::bind_method(D_METHOD("getDelay"), &RollbackManager::getDelay);
 	ClassDB::bind_method(D_METHOD("setDelay", "delay"), &RollbackManager::setDelay);
     ClassDB::bind_method(D_METHOD("getRollFrames"), &RollbackManager::getRollFrames);
@@ -28,6 +28,7 @@ void RollbackManager::_bind_methods()
     ClassDB::bind_method(D_METHOD("getInputArrivedForFrame", "frame"), &RollbackManager::getInputArrivedForFrame);
     ClassDB::bind_method(D_METHOD("getLocalInputForFrame", "frame"), &RollbackManager::getLocalInputForFrame);
     ClassDB::bind_method(D_METHOD("getNetInputForFrame", "frame"), &RollbackManager::getNetInputForFrame);
+    ClassDB::bind_method(D_METHOD("getConnectionStatus"), &RollbackManager::getConnectionStatus);
 
     ClassDB::bind_method(D_METHOD("getIp"), &RollbackManager::getIp);
 	ClassDB::bind_method(D_METHOD("setIp", "ipToConnect"), &RollbackManager::setIp);
@@ -39,6 +40,9 @@ void RollbackManager::_bind_methods()
 	ClassDB::bind_method(D_METHOD("setPacketLossPercentage", "packetloss"), &RollbackManager::setPacketLossPercentage);
 
     ClassDB::bind_method(D_METHOD("netInputThreadFunc"), &RollbackManager::netInputThreadFunc);
+    ClassDB::bind_method(D_METHOD("addToGameState", "name", "data"), &RollbackManager::addToGameState);
+
+    //Properties
     ClassDB::add_property("RollbackManager", PropertyInfo(Variant::INT, "_processInputDelay", PROPERTY_HINT_RANGE, "0,120"), "setDelay", "getDelay");
     ClassDB::add_property("RollbackManager", PropertyInfo(Variant::INT, "_numRollbackFrames", PROPERTY_HINT_RANGE, "1,120"), "setRollFrames", "getRollFrames");
     ClassDB::add_property("RollbackManager", PropertyInfo(Variant::FLOAT, "_axisSensitivity", PROPERTY_HINT_RANGE, "0.0,1.0,0.05"), "setAxisSensitivity", "getAxisSensitivity");
@@ -47,9 +51,6 @@ void RollbackManager::_bind_methods()
     ClassDB::add_property("RollbackManager", PropertyInfo(Variant::INT, "_port", PROPERTY_HINT_RANGE, "1,15000"), "setPort", "getPort");
     ClassDB::add_property("RollbackManager", PropertyInfo(Variant::INT, "_portToListen", PROPERTY_HINT_RANGE, "1,15000"), "setPortToListen", "getPortToListen");
     ClassDB::add_property("RollbackManager", PropertyInfo(Variant::INT, "_packetLossPercentage", PROPERTY_HINT_RANGE, "0,100"), "setPacketLossPercentage", "getPacketLossPercentage");
-
-    //Methods
-    ClassDB::bind_method(D_METHOD("addToGameState", "name", "data"), &RollbackManager::addToGameState);
 
     //Signals
     ADD_SIGNAL(MethodInfo("onSaveGameState"));
@@ -64,22 +65,20 @@ void RollbackManager::_bind_methods()
 
 RollbackManager::RollbackManager()
 {
-    
 }
 
 RollbackManager::~RollbackManager()
 {
-   
 }
 
 
 void godot::RollbackManager::_ready()
 {
     if (Engine::get_singleton()->is_editor_hint())
-     {
+    {
         set_process_mode(Node::ProcessMode::PROCESS_MODE_DISABLED);
         return;
-     }
+    }
     else
         set_process_mode(Node::ProcessMode::PROCESS_MODE_INHERIT);
 
@@ -136,6 +135,16 @@ void godot::RollbackManager::getCurrentInput()
 void godot::RollbackManager::_physics_process(double delta)
 {
     _inputReceivedMutex->lock();
+    if(_connectionState == NET_STATE::END)
+    {
+        _inputReceivedMutex->unlock();
+        sendEndGamePacket();
+        if(!_netThread.is_null())
+        {    
+            _netThread->wait_to_finish();
+        }
+    }
+
     if(_inputReceived)
     {
         _inputArrayMutex->lock();
@@ -171,9 +180,29 @@ void godot::RollbackManager::_physics_process(double delta)
 }
 
 void godot::RollbackManager::_exit_tree()
-{
+{    
+    if (Engine::get_singleton()->is_editor_hint())
+    {        
+        return;
+    }
+
+    _inputReceivedMutex->lock();
+    _connectionState = NET_STATE::END;
+    _inputReceivedMutex->unlock();
+
     if(!_netThread.is_null())
+    {    
         _netThread->wait_to_finish();
+    }
+
+    if(!_socketUdp.is_null())
+    {
+        sendEndGamePacket();
+        if(_socketUdp->is_bound())
+        {
+            _socketUdp->close();
+        }
+    }    
 }
 
 void godot::RollbackManager::onHandleInput(const InputState& inputs)
@@ -268,8 +297,14 @@ void godot::RollbackManager::netInputThreadFunc()
 {    
     while(true)
     {
-        PackedByteArray netInData = _socketUdp->get_packet();
+        _inputReceivedMutex->lock();
+        if(_connectionState == NET_STATE::END)
+        {
+            return;
+        }
+        _inputReceivedMutex->unlock();
 
+        PackedByteArray netInData = _socketUdp->get_packet();
         if(netInData.is_empty())
             continue;
        
@@ -278,31 +313,25 @@ void godot::RollbackManager::netInputThreadFunc()
         {
             case NET_PACKET_TYPE::INPUT:
             {                
-                //UtilityFunctions::print("Received input packet");
                 processInputPacket(netInData);
                 break;
             }
             case NET_PACKET_TYPE::INPUT_REQUEST:
             {
-                //UtilityFunctions::print("Received Request input packet");
                 processRequestPacket(netInData);
                 break;
             }
             case NET_PACKET_TYPE::HANDSHAKE:
             {
-                //UtilityFunctions::print("Received Handshake packet");
                 processHandshakePacket(netInData);
                 break;
             }
             case NET_PACKET_TYPE::GAME_END:
             {
+                processEndGamePacket();
                 break;
             }
-        }
-        
-
-               
-    
+        }                           
     }
 }
 
@@ -327,7 +356,6 @@ void godot::RollbackManager::sendNetData(const PackedByteArray &netData)
 
 void godot::RollbackManager::sendInputPacket(const InputState& inputToSend)
 {
-    //UtilityFunctions::print("Send inpur");
     PackedByteArray netData{};
     netData.append((unsigned char)NET_PACKET_TYPE::INPUT);
 
@@ -342,7 +370,6 @@ void godot::RollbackManager::sendInputPacket(const InputState& inputToSend)
         netData.append((unsigned char)frameToSend);
         netData.append(_inputs[frameToSend].localInputs.encodedValue);
     }
-    
     sendNetData(netData);   
 }
 
@@ -358,25 +385,28 @@ void godot::RollbackManager::sendInputPacket(int frameNeeded)
 
 void godot::RollbackManager::sendRequestInputPacket(int frameNeeded)
 {
-    //UtilityFunctions::print("Send request");
     PackedByteArray netData{};
     netData.append((unsigned char)NET_PACKET_TYPE::INPUT_REQUEST);
     netData.append((unsigned char)frameNeeded);
     netData.append((unsigned char)((frameNeeded + _processInputDelay) % 256));
-
-    //UtilityFunctions::print("Requesting for frame: ", frameNeeded);
 
     sendNetData(netData); 
 }
 
 void godot::RollbackManager::sendHandshakePacket(bool isReply)
 {
-    //UtilityFunctions::print("Send handshake");
     PackedByteArray netData{};
     netData.append((unsigned char)NET_PACKET_TYPE::HANDSHAKE);
     netData.append((unsigned char)isReply ? 1 : 0);
 
     sendNetData(netData);    
+}
+
+void godot::RollbackManager::sendEndGamePacket()
+{
+    PackedByteArray netData{};
+    netData.append((unsigned char)NET_PACKET_TYPE::GAME_END);
+    sendNetData(netData);
 }
 
 void godot::RollbackManager::processInputPacket(const PackedByteArray &netData)
@@ -393,14 +423,15 @@ void godot::RollbackManager::processInputPacket(const PackedByteArray &netData)
         if(_inputArrivedPerFrame[netFrame] == true)
         {
             //We already have input for this frame 
-            //UtilityFunctions::print("We already have input for this frame");    
             break;
         }
-
-        unsigned char inputBit = 1; 
+        newInput = true;
+         
         InputState& frameInputState = _inputs[netFrame]; 
         frameInputState.resetNetInput(); 
-        frameInputState.netInputs.encodedValue = netEncodedInput;                 
+        frameInputState.netInputs.encodedValue = netEncodedInput; 
+
+        unsigned char inputBit = 1;                
         for(const String& action : CustomInput::_customActions)
         {           
             float decodedValue = 0.0f;
@@ -412,12 +443,8 @@ void godot::RollbackManager::processInputPacket(const PackedByteArray &netData)
             frameInputState.netInputs.actions.insert(action, decodedValue);
             inputBit *= 2;                        
         }
-        _inputArrivedPerFrame[netFrame] = true;  
-        newInput = true;
-        packetIndex += 2;
-
-        UtilityFunctions::print("Frame: ", netFrame);
-        frameInputState.print();               
+        _inputArrivedPerFrame[netFrame] = true;          
+        packetIndex += 2;           
     }            
     _inputArrayMutex->unlock();
 
@@ -473,6 +500,13 @@ void godot::RollbackManager::processHandshakePacket(const PackedByteArray &netDa
             sendHandshakePacket(true);            
         }
     }					
+}
+
+void godot::RollbackManager::processEndGamePacket()
+{
+    _inputReceivedMutex->lock();
+    _connectionState = NET_STATE::END;
+    _inputReceivedMutex->unlock();
 }
 
 void godot::RollbackManager::updateGameState(float delta)

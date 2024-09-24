@@ -15,9 +15,12 @@ func _process(delta):
 	var rollbackDebug : String
 	
 	if(rollbackManager != null):
-		rollbackDebug = "Recevier IP: " + rollbackManager.getIp() + " \n" + "Listening Port: " + str(rollbackManager.getPortToListen()) + " \n" + "Sending to Port: " + str(rollbackManager.getPort()) + " \n" + " Frame: " + str(frame)
+		rollbackDebug = "Recevier IP: " + rollbackManager.getIp() + " \n" + "Listening Port: " + str(rollbackManager.getPortToListen()) + " \n" + "Sending to Port: " + str(rollbackManager.getPort()) + " \n" + " Frame: " + str(frame) + '\n'
 	else:
 		rollbackDebug = "RollbackManager is Null"
+	
+	rollbackDebug += rollbackManager.getConnectionStatus()
+	
 	set_text(rollbackDebug)
 	pass
 

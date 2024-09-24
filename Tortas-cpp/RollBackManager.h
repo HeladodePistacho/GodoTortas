@@ -100,9 +100,11 @@ namespace godot
         void sendInputPacket(int frameNeededStart);
         void sendRequestInputPacket(int frameNeeded);
         void sendHandshakePacket(bool isReply);
+        void sendEndGamePacket();
         void processInputPacket(const PackedByteArray& netData);
         void processRequestPacket(const PackedByteArray& netData);
         void processHandshakePacket(const PackedByteArray& netData);
+        void processEndGamePacket();
 
         void updateGameState(float delta);
 
@@ -203,6 +205,18 @@ namespace godot
         int getNetInputForFrame(int frame) const 
         {
             return _inputs[frame].netInputs.encodedValue;
+        }
+        String getConnectionStatus() const
+        {
+            switch (_connectionState)
+            {
+            case NET_STATE::WAITING:
+                return "Waiting for game start or frame";
+            case NET_STATE::PLAYING:
+                return "Playing the game";
+            case NET_STATE::END:
+                return "Game Ended";
+            }
         }
 
         //Net
