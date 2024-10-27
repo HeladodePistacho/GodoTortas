@@ -7,15 +7,21 @@
 
 namespace godot {
 
+    enum class FrameStatus
+    {
+        REAL,
+        GUESSED
+    };
+
     class FrameState
     {
         public:
         InputState frameInputs{};
         GameState frameGameState{};
         int frameIndex = 0;
+        FrameStatus frameStatus =  FrameStatus::REAL;
 
-        FrameState();
-        FrameState(const InputState& inputs, const GameState& gameState, int frame);
+        FrameState(const InputState& inputs, const GameState& gameState, int frame, FrameStatus status);
         ~FrameState();
     };
 };

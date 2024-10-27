@@ -17,6 +17,7 @@
 #include <vector>
 #include <string>
 #include <queue>
+#include <deque>
 #include <godot_cpp/classes/thread.hpp>
 #include <godot_cpp/classes/mutex.hpp>
 #include <godot_cpp/classes/random_number_generator.hpp>
@@ -77,7 +78,7 @@ namespace godot
         LocalVector<InputState> _inputs;
 
         //Queue with saved frames
-        std::queue<FrameState> _savedFrames;
+        std::deque<FrameState> _savedFrames;
 
         InputState _currentInputState;
 
@@ -107,6 +108,8 @@ namespace godot
         //amount of input packets to send per frame
         int _packetSentAmount = 3;
 
+        LocalVector<bool> _prevFrameArrival; //This holds if the input arrived for the (frame - _numRollbackFrames)
+
         String _ipToConnect;
         int _port = 0;
         int _portToListen = 0;
@@ -116,7 +119,8 @@ namespace godot
         bool getInputReceivedTS(); //TS stands for thread safe
         bool getInputArrivedPerFrameTS(int frame);
         bool isConnectionEndedTS();
-        const InputState& getInputStateForFrameTS(int frame);
+        bool isPastFrameStateGuessedTS();
+        InputState getInputStateForFrameTS(int frame);
 
         void netInputThreadFunc();
         void sendNetData(const PackedByteArray& netData);
@@ -130,6 +134,10 @@ namespace godot
         void processHandshakePacket(const PackedByteArray& netData);
         void processEndGamePacket();
 
+        void tryToRollback();
+        int getPreviousFrame(int numFrameBehind);
+        const GameState& loadCurrentGameState();
+        FrameStatus getCurrentFrameStatus(InputState& frameInput);
         void updateGameState(float delta);
 
     protected:
@@ -148,7 +156,7 @@ namespace godot
 
         //Game state 
         void addToGameState(const String &name, const PackedByteArray& data);
-        void onResetGameState();
+        void onResetGameState(const FrameState& frameState);
       
         //Properties
         void setDelay(const int delay)

@@ -85,9 +85,11 @@ void godot::RollbackManager::_ready()
     }
 
     //Init frame states
+    _prevFrameArrival.reserve(_numRollbackFrames);
     for(int i = 0; i < _numRollbackFrames; ++i)
     {
-        _savedFrames.emplace(InputState(), GameState(), 0);
+        _savedFrames.emplace_back(InputState(), loadCurrentGameState(), 0, FrameStatus::REAL);
+        _prevFrameArrival.push_back(true);
     }
 
     //We assume empty inputs for first frames of the game
@@ -138,7 +140,7 @@ void godot::RollbackManager::ProcessCurrentInput()
     sendInputPacket(futureInputState);
 
     //Reset input arrived array
-    _inputArrivedPerFrame[(_frameNumber + (_processInputDelay * 2) + 1) % 256] = false;  
+    _inputArrivedPerFrame[(_frameNumber + (_processInputDelay * 2) + _numRollbackFrames + 1) % 256] = false;  
 }
 {   
     LockGuard lock{_inputRequestMutex};
@@ -146,11 +148,8 @@ void godot::RollbackManager::ProcessCurrentInput()
     _inputRequestAvailablePerFrame[(_frameNumber + _processInputDelay) % 256] = true;
 
     //Set past frame input as not available for request
-    int frameToReset = _frameNumber - _processInputDelay;
-    if(frameToReset < 0)
-    {
-       frameToReset = 256 + frameToReset;
-    }
+    //If doesnt work return to monke
+    int frameToReset = getPreviousFrame(_processInputDelay + (_numRollbackFrames * 2));
     _inputRequestAvailablePerFrame[frameToReset] = false;
 }
 }
@@ -165,19 +164,32 @@ void godot::RollbackManager::_physics_process(double delta)
             _netThread->wait_to_finish();
         }
     }
-    
+
     if(getInputReceivedTS())
     {
-        if(getInputArrivedPerFrameTS(_frameNumber)) //If the input for the current frame has arrived we proceed
+        if(isPastFrameStateGuessedTS())
         {
-            updateGameState(delta);
+            int pastFrameIndex;
+            {
+                LockGuard lock{_inputReceivedMutex};
+                pastFrameIndex = _savedFrames.front().frameIndex;
+            }
+
+            if(getInputArrivedPerFrameTS(pastFrameIndex))
+            {
+                updateGameState(delta);
+            }
+            else
+            {            
+                sendRequestInputPacket(pastFrameIndex);
+
+                LockGuard lock{_inputReceivedMutex};
+                _inputReceived = false;
+            }
         }
         else
-        {            
-            sendRequestInputPacket(_frameNumber);
-
-            LockGuard lock{_inputReceivedMutex};
-            _inputReceived = false;
+        {
+            updateGameState(delta);
         }
     }
     else
@@ -185,7 +197,7 @@ void godot::RollbackManager::_physics_process(double delta)
         LockGuard lock{_inputReceivedMutex};
         if(_connectionState == NET_STATE::PLAYING)
         {
-            sendRequestInputPacket(_frameNumber);
+            sendRequestInputPacket(_savedFrames.front().frameIndex);
             return;
         }
 
@@ -258,9 +270,9 @@ void godot::RollbackManager::addToGameState(const String &name, const PackedByte
    _currentGameState.stateBuffer.append_array(data);
 }
 
-void godot::RollbackManager::onResetGameState()
+void godot::RollbackManager::onResetGameState(const FrameState& frameState)
 {
-    const auto& oldGameState = _savedFrames.front().frameGameState;
+    const auto& oldGameState = frameState.frameGameState;
 
     int acumulatedBufferSize = 0;
     auto& it = oldGameState.elementsSaved.begin();
@@ -331,7 +343,13 @@ bool godot::RollbackManager::isConnectionEndedTS()
     return _connectionState == NET_STATE::END;
 }
 
-const InputState &godot::RollbackManager::getInputStateForFrameTS(int frame)
+bool godot::RollbackManager::isPastFrameStateGuessedTS()
+{
+    LockGuard lock{_inputReceivedMutex};
+    return _savedFrames.front().frameStatus == FrameStatus::GUESSED;
+}
+
+InputState godot::RollbackManager::getInputStateForFrameTS(int frame)
 {
     LockGuard lock{_inputArrayMutex};
     return _inputs[frame];
@@ -546,25 +564,112 @@ void godot::RollbackManager::processEndGamePacket()
     _connectionState = NET_STATE::END;
 }
 
+void godot::RollbackManager::tryToRollback()
+{
+    LockGuard lock{_inputArrayMutex};
+
+    //Look for frames that has been guessed
+    LocalVector<bool> currentArrivalArray;
+    currentArrivalArray.reserve(_numRollbackFrames + 1);
+    LocalVector<InputElement> pastActualInputsArray;
+
+    for(int i = 0; i < _numRollbackFrames; ++i)
+    {
+        int frameToCheck = getPreviousFrame(_numRollbackFrames - i);
+        currentArrivalArray.push_back(_inputArrivedPerFrame[frameToCheck]);
+
+        if(currentArrivalArray[i] != _prevFrameArrival[i])
+        {
+            pastActualInputsArray.push_back(_inputs[frameToCheck].netInputs);
+        }
+    }
+
+    //Yo que se
+    if(pastActualInputsArray.is_empty())
+    { 
+        return;
+    }
+
+    bool startedRollback = false;
+    int stateIndex = 0;
+    InputElement* newPastActualInput = nullptr;
+    int pastActualInputsIndex = 0;
+
+    for(FrameState& frameState : _savedFrames)
+    {
+        if(!_prevFrameArrival[stateIndex] && currentArrivalArray[stateIndex])
+        {
+            newPastActualInput = &pastActualInputsArray[pastActualInputsIndex];
+            ++pastActualInputsIndex;
+
+            if(frameState.frameInputs.netInputs.encodedValue != newPastActualInput->encodedValue)
+            {
+                frameState.frameInputs.netInputs = *newPastActualInput;
+                frameState.frameStatus = FrameStatus::REAL;
+                if(!startedRollback)
+                {
+                    //Reset game state for game elements
+                    onResetGameState(frameState);
+                    startedRollback = true;
+                }
+
+            }
+        }
+
+        if(startedRollback)
+        {
+            const GameState& currentGameState = loadCurrentGameState();
+            onHandleInput(frameState.frameInputs);
+            frameState.frameGameState = currentGameState;
+        }
+    }
+}
+
+int godot::RollbackManager::getPreviousFrame(int numFrameBehind)
+{
+    int frameBehind = _frameNumber - numFrameBehind;
+    return frameBehind < 0 ? 256 + frameBehind : frameBehind;
+}
+
+const GameState& godot::RollbackManager::loadCurrentGameState()
+{
+    _currentGameState.reset();
+    emit_signal("onSaveGameState");
+    return _currentGameState;
+}
+
+FrameStatus godot::RollbackManager::getCurrentFrameStatus(InputState& frameInput)
+{
+    LockGuard lock{_inputArrayMutex};
+
+    //if current frame input has not arrived we guess it -> in this case with the previous frame input
+    FrameStatus frameStatus = FrameStatus::REAL;
+    if(_inputArrivedPerFrame[_frameNumber])
+    {
+        int previousFrame = getPreviousFrame(1);
+        frameInput.netInputs = _inputs[previousFrame].netInputs;
+        _inputs[_frameNumber].netInputs = _inputs[previousFrame].netInputs;
+        frameStatus = FrameStatus::GUESSED;
+    }
+
+    return frameStatus;
+}
+
 void godot::RollbackManager::updateGameState(float delta)
 {
     //Process Inputs
     ProcessCurrentInput();
+    InputState currentFrameInputState = getInputStateForFrameTS(_frameNumber);
+
+    //This should probably go into threadsaafe so we don't have race condition 
+    FrameStatus frameStatus = getCurrentFrameStatus(currentFrameInputState);   
+    tryToRollback();
 
     //Create Game State
-    _currentGameState.reset();
-    emit_signal("onSaveGameState");
+    loadCurrentGameState();
 
     //Frame start
     emit_signal("onFrameStart");
-
-    const auto inputSingleton = Input::get_singleton();
-    if(inputSingleton->get_action_strength("test"))
-    {
-        //onResetGameState();
-    }
-
-    const InputState& currentFrameInputState = getInputStateForFrameTS(_frameNumber);
 
     //Handle frame Inputs
     onHandleInput(currentFrameInputState);
@@ -576,10 +681,10 @@ void godot::RollbackManager::updateGameState(float delta)
     emit_signal("onFrameEnd", delta);
 
     //Store current frame state
-    _savedFrames.emplace(FrameState(currentFrameInputState, _currentGameState, _frameNumber));   
+    _savedFrames.emplace_back(FrameState(currentFrameInputState, _currentGameState, _frameNumber, frameStatus));   
 
     //Remove oldest frame state
-    _savedFrames.pop();
+    _savedFrames.pop_front();
 
     //Progress frame number
     _frameNumber >= 255 ? _frameNumber = 0 : ++_frameNumber;
