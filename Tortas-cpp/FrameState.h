@@ -9,7 +9,7 @@ namespace godot {
 
     enum class FrameStatus
     {
-        REAL,
+        REAL = 0,
         GUESSED
     };
 

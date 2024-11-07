@@ -140,6 +140,7 @@ void godot::RollbackManager::ProcessCurrentInput()
     sendInputPacket(futureInputState);
 
     //Reset input arrived array
+    UtilityFunctions::print("Reseting input per frame: ", (_frameNumber + (_processInputDelay * 2) + _numRollbackFrames + 1) % 256);
     _inputArrivedPerFrame[(_frameNumber + (_processInputDelay * 2) + _numRollbackFrames + 1) % 256] = false;  
 }
 {   
@@ -165,6 +166,7 @@ void godot::RollbackManager::_physics_process(double delta)
         }
     }
 
+    UtilityFunctions::print(getInputReceivedTS());
     if(getInputReceivedTS())
     {
         if(isPastFrameStateGuessedTS())
@@ -177,10 +179,12 @@ void godot::RollbackManager::_physics_process(double delta)
 
             if(getInputArrivedPerFrameTS(pastFrameIndex))
             {
+                UtilityFunctions::print("Update 1");
                 updateGameState(delta);
             }
             else
-            {            
+            {         
+                UtilityFunctions::print("Sending request");
                 sendRequestInputPacket(pastFrameIndex);
 
                 LockGuard lock{_inputReceivedMutex};
@@ -189,6 +193,7 @@ void godot::RollbackManager::_physics_process(double delta)
         }
         else
         {
+            UtilityFunctions::print("Update 2");
             updateGameState(delta);
         }
     }
@@ -644,7 +649,7 @@ FrameStatus godot::RollbackManager::getCurrentFrameStatus(InputState& frameInput
 
     //if current frame input has not arrived we guess it -> in this case with the previous frame input
     FrameStatus frameStatus = FrameStatus::REAL;
-    if(_inputArrivedPerFrame[_frameNumber])
+    if(!_inputArrivedPerFrame[_frameNumber])
     {
         int previousFrame = getPreviousFrame(1);
         frameInput.netInputs = _inputs[previousFrame].netInputs;
@@ -663,6 +668,7 @@ void godot::RollbackManager::updateGameState(float delta)
 
     //This should probably go into threadsaafe so we don't have race condition 
     FrameStatus frameStatus = getCurrentFrameStatus(currentFrameInputState);   
+    UtilityFunctions::print("Frame: ", _frameNumber, " frameStatus: ", (int)frameStatus);
     tryToRollback();
 
     //Create Game State
